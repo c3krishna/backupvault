@@ -1,0 +1,85 @@
+/* index.css - all colors use CSS variables set by ThemeContext */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Dark theme defaults — overridden by ThemeContext at runtime */
+  --bv-bg:         var(--bv-bg);
+  --bv-bg2:        var(--bv-bg2);
+  --bv-bg3:        var(--bv-bg3);
+  --bv-bg4:        var(--bv-bg4);
+  --bv-bg5:        var(--bv-bg5);
+  --bv-bd:         var(--bv-bd);
+  --bv-bd2:        var(--bv-bd2);
+  --bv-txt:        var(--bv-txt);
+  --bv-txt2:       var(--bv-txt2);
+  --bv-txt3:       var(--bv-txt3);
+  --bv-blue:       var(--bv-blue);
+  --bv-blue-dim:   var(--bv-blue-dim);
+  --bv-blue-bg:    var(--bv-blue-bg);
+  --bv-green:      var(--bv-green);
+  --bv-green-bg:   var(--bv-green-bg);
+  --bv-green-dim:  var(--bv-green-dim);
+  --bv-red:        var(--bv-red);
+  --bv-red-bg:     var(--bv-red-bg);
+  --bv-red-dim:    var(--bv-red-dim);
+  --bv-red-border: var(--bv-red-border);
+  --bv-amber:      var(--bv-amber);
+  --bv-amber-bg:   var(--bv-amber-bg);
+  --bv-amber-dim:  var(--bv-amber-dim);
+  --bv-cyan:       var(--bv-cyan);
+  --bv-cyan-bg:    var(--bv-cyan-bg);
+  --bv-purple:     var(--bv-purple);
+  --bv-purple-bg:  var(--bv-purple-bg);
+  --bv-orange:     var(--bv-orange);
+  --bv-accent:     var(--bv-accent);
+  --bv-sidebar:    var(--bv-bg2);
+  --bv-card:       var(--bv-bg2);
+  --bv-input:      var(--bv-bg4);
+  --bv-hover:      var(--bv-bg3);
+  --bv-shadow:     rgba(0,0,0,0.4);
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bv-bg);
+  color: var(--bv-txt);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: background 0.2s, color 0.2s;
+}
+
+/* All inputs/selects/textareas inherit theme */
+input, select, textarea {
+  font-family: inherit;
+  font-size: 13px;
+  background: var(--bv-input);
+  border: 1px solid var(--bv-bd2);
+  color: var(--bv-txt);
+  border-radius: 8px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color .15s, background .15s, color .15s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--bv-blue); }
+input::placeholder { color: var(--bv-txt3); }
+select option { background: var(--bv-bg3); color: var(--bv-txt); }
+
+/* Buttons */
+button { cursor: pointer; font-family: inherit; transition: background .15s, color .15s; }
+
+/* Links */
+a { color: var(--bv-blue); text-decoration: none; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bv-bg); }
+::-webkit-scrollbar-thumb { background: var(--bv-bd2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bv-txt3); }
+
+/* Mono */
+.mono { font-family: 'Consolas', 'Monaco', monospace; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+
+/* Spin animation */
+@keyframes bvspin { to { transform: rotate(360deg); } }
