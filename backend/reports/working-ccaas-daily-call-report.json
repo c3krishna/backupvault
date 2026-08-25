@@ -1,0 +1,25 @@
+{
+  "key": "ccaas-daily-call-report",
+  "name": "Sales Daily Call Report (CCaaS)",
+  "description": "Agent-wise dialled call details.",
+  "environment": "LIVE",
+  "params": [
+    { "name": "reportDate", "label": "Report date", "type": "date", "default": "today" },
+    { "name": "domainId",   "label": "Domain ID",   "type": "int",  "default": 20704, "required": true }
+  ],
+  "steps": [
+    {
+      "id": "calls",
+      "connection": "7",
+      "type": "rows",
+      "sql": "SELECT tu.UserName AS UserName, tu.UserID AS UserID, tu.emailId AS emailId, tu.ext AS Extension, dp.your_number AS From_Number, tch.customerNumber AS To_Number, ROUND(tch.callDuration / 1000) AS `Call_Duration(sec)`, tcdh.createdAt AS Called_Time FROM tb_CallHistory tch JOIN tb_CallDurationHistory tcdh ON tch.CallHistoryId = tcdh.CallHistoryId JOIN tb_User tu ON tu.UserID = tcdh.AgentId LEFT JOIN did_purchase dp ON dp.user_id = tu.ext AND dp.domainId = tch.domainId WHERE tch.domainId = :domainId ORDER BY tcdh.createdAt DESC"
+    }
+  ],
+  "merge": { "base": "calls", "enrich": [] },
+  "email": {
+    "to": ["krishnakumar.pethiah@gmail.com", "linuxadmins@worktual.com","finance@worktual.com"],
+    "subject": "Daily - Sales Call Report {{reportDateCompact}}",
+    "attachAs": "Call_Report_{{reportDateCompact}}.csv",
+    "body": "Hi,\n\nPlease find attached today's Sales call report.\n\nRows: {{rowCount}}\n\nRegards,\nServer Automation"
+  }
+}

@@ -1,0 +1,253 @@
+/* ==========================================================================
+   BackupVault :: Query Execution + Reports
+   Every rule is scoped under .qe-root so it cannot leak into the rest of the
+   dashboard. The accent rail on the left edge is driven by --qe-accent, which
+   flips between QA and LIVE — the environment is readable at a glance without
+   reading a label.
+   ========================================================================== */
+
+.qe-root {
+  --qe-bg:        #ffffff;
+  --qe-panel:     #f6f8fa;
+  --qe-border:    #d8dee6;
+  --qe-ink:       #1b2733;
+  --qe-ink-soft:  #5b6b7c;
+  --qe-accent:    #0f766e;         /* QA — teal */
+  --qe-accent-ink:#ffffff;
+  --qe-danger:    #b42318;
+  --qe-warn:      #b54708;
+  --qe-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  position: relative;
+  padding: 20px 24px 40px 28px;
+  color: var(--qe-ink);
+  background: var(--qe-bg);
+  font-size: 14px;
+}
+
+.qe-root::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--qe-accent);
+}
+
+.qe-root.qe-live { --qe-accent: #b42318; }   /* LIVE — red */
+
+@media (prefers-color-scheme: dark) {
+  .qe-root {
+    --qe-bg: #0f151b;
+    --qe-panel: #161e26;
+    --qe-border: #2a3641;
+    --qe-ink: #e6edf3;
+    --qe-ink-soft: #93a4b5;
+    --qe-accent: #2dd4bf;
+    --qe-accent-ink: #06231f;
+    --qe-danger: #ff6b5e;
+    --qe-warn: #f5a524;
+  }
+  .qe-root.qe-live { --qe-accent: #ff6b5e; --qe-accent-ink: #2a0806; }
+}
+
+/* ── header ─────────────────────────────────────────────────────────────── */
+.qe-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.qe-title { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+.qe-sub, .qe-desc { margin: 4px 0 0; color: var(--qe-ink-soft); font-size: 13px; }
+.qe-desc { max-width: 70ch; margin-bottom: 12px; }
+
+.qe-banner {
+  border: 1px solid var(--qe-accent);
+  border-left-width: 4px;
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--qe-ink);
+  background: color-mix(in srgb, var(--qe-accent) 8%, transparent);
+}
+
+/* ── target bar ─────────────────────────────────────────────────────────── */
+.qe-targets {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+  padding: 14px; margin-bottom: 14px;
+  background: var(--qe-panel);
+  border: 1px solid var(--qe-border);
+  border-radius: 6px;
+}
+.qe-field { display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.qe-field.qe-grow { flex: 1 1 260px; }
+.qe-field.qe-field-action { justify-content: flex-end; min-width: 0; }
+.qe-field label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--qe-ink-soft); }
+
+.qe-root select,
+.qe-root input[type="text"],
+.qe-root input[type="date"] {
+  height: 34px; padding: 0 10px;
+  font: inherit; color: var(--qe-ink);
+  background: var(--qe-bg);
+  border: 1px solid var(--qe-border);
+  border-radius: 4px;
+}
+.qe-input-wide { width: 100%; height: 34px; padding: 0 10px; }
+.qe-root :focus-visible { outline: 2px solid var(--qe-accent); outline-offset: 1px; }
+
+.qe-segment { display: inline-flex; border: 1px solid var(--qe-border); border-radius: 4px; overflow: hidden; }
+.qe-segment button {
+  padding: 8px 16px; font: inherit; font-weight: 600; font-size: 12px; letter-spacing: 0.04em;
+  color: var(--qe-ink-soft); background: var(--qe-bg); border: 0; cursor: pointer;
+}
+.qe-segment button + button { border-left: 1px solid var(--qe-border); }
+.qe-segment button.is-active { background: var(--qe-accent); color: var(--qe-accent-ink); }
+
+/* ── editor ─────────────────────────────────────────────────────────────── */
+.qe-editor { border: 1px solid var(--qe-border); border-radius: 6px; overflow: hidden; margin-bottom: 14px; }
+.qe-editor textarea {
+  display: block; width: 100%; min-height: 170px; resize: vertical;
+  padding: 12px 14px; border: 0;
+  font-family: var(--qe-mono); font-size: 13px; line-height: 1.6;
+  tab-size: 2; color: var(--qe-ink); background: var(--qe-bg);
+}
+.qe-editor textarea:focus { outline: none; box-shadow: inset 0 0 0 2px var(--qe-accent); }
+.qe-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 12px; background: var(--qe-panel); border-top: 1px solid var(--qe-border);
+}
+.qe-hint { font-size: 12px; color: var(--qe-ink-soft); }
+.qe-action-buttons { display: flex; gap: 8px; }
+
+.qe-run {
+  height: 34px; padding: 0 18px; font: inherit; font-weight: 600; cursor: pointer;
+  color: var(--qe-accent-ink); background: var(--qe-accent);
+  border: 1px solid var(--qe-accent); border-radius: 4px;
+}
+.qe-run-sm { height: 28px; padding: 0 12px; font-size: 12px; }
+.qe-ghost {
+  height: 34px; padding: 0 14px; font: inherit; cursor: pointer;
+  color: var(--qe-ink); background: var(--qe-bg);
+  border: 1px solid var(--qe-border); border-radius: 4px;
+}
+.qe-run:disabled, .qe-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── messages ───────────────────────────────────────────────────────────── */
+.qe-error, .qe-notice {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 14px; border-radius: 4px; font-size: 13px;
+}
+.qe-error { color: var(--qe-danger); border: 1px solid var(--qe-danger); background: color-mix(in srgb, var(--qe-danger) 7%, transparent); }
+.qe-notice { color: var(--qe-ink); border: 1px solid var(--qe-border); background: var(--qe-panel); }
+.qe-error-tag {
+  flex: none; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase; color: #fff; background: var(--qe-danger);
+}
+
+/* ── step summary ───────────────────────────────────────────────────────── */
+.qe-steps { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0 0 14px; list-style: none; }
+.qe-steps li {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 5px 10px; border: 1px solid var(--qe-border); border-radius: 4px; background: var(--qe-panel);
+}
+.qe-steps code { font-family: var(--qe-mono); font-size: 12px; }
+.qe-substats { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; font-size: 12px; color: var(--qe-ink-soft); }
+
+/* ── results ────────────────────────────────────────────────────────────── */
+.qe-results { border: 1px solid var(--qe-border); border-radius: 6px; overflow: hidden; }
+.qe-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 18px;
+  padding: 10px 14px; background: var(--qe-panel); border-bottom: 1px solid var(--qe-border); font-size: 13px;
+}
+.qe-status-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.qe-status-right label { font-size: 12px; color: var(--qe-ink-soft); }
+.qe-status-right select { height: 28px; }
+.qe-status-right .qe-ghost { height: 28px; padding: 0 12px; font-size: 12px; }
+.qe-warn { color: var(--qe-warn); font-weight: 600; }
+
+.qe-table-wrap { max-height: 60vh; overflow: auto; }
+.qe-table { width: 100%; border-collapse: collapse; font-family: var(--qe-mono); font-size: 12.5px; }
+.qe-table th, .qe-table td {
+  padding: 7px 12px; text-align: left; white-space: nowrap;
+  max-width: 340px; overflow: hidden; text-overflow: ellipsis;
+  border-bottom: 1px solid var(--qe-border);
+}
+.qe-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  font-weight: 650; color: var(--qe-ink-soft); background: var(--qe-panel);
+  border-bottom: 2px solid var(--qe-border);
+}
+.qe-table tbody tr:hover td { background: color-mix(in srgb, var(--qe-accent) 6%, transparent); }
+.qe-rownum { width: 1%; color: var(--qe-ink-soft); text-align: right; user-select: none; }
+.qe-null { color: var(--qe-ink-soft); opacity: 0.6; }
+.qe-empty { padding: 28px 14px; margin: 0; text-align: center; color: var(--qe-ink-soft); }
+
+/* ── pager ──────────────────────────────────────────────────────────────── */
+.qe-pager {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; background: var(--qe-panel); border-top: 1px solid var(--qe-border);
+}
+.qe-range { font-size: 12px; color: var(--qe-ink-soft); }
+.qe-pager-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+.qe-pager-buttons button {
+  min-width: 32px; height: 30px; padding: 0 9px; font: inherit; font-size: 12.5px; cursor: pointer;
+  color: var(--qe-ink); background: var(--qe-bg); border: 1px solid var(--qe-border); border-radius: 4px;
+}
+.qe-pager-buttons button:disabled { opacity: 0.4; cursor: not-allowed; }
+.qe-pager-buttons button.is-current {
+  font-weight: 700; color: var(--qe-accent-ink);
+  background: var(--qe-accent); border-color: var(--qe-accent);
+}
+.qe-gap { padding: 0 4px; color: var(--qe-ink-soft); }
+
+/* ── history ────────────────────────────────────────────────────────────── */
+.qe-history { margin-top: 20px; }
+.qe-history h2 { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
+.qe-history ul { padding: 0; margin: 0; list-style: none; }
+.qe-history li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--qe-border);
+}
+.qe-history li > button {
+  flex: 1 1 340px; padding: 0; text-align: left; cursor: pointer;
+  background: none; border: 0; color: var(--qe-ink);
+}
+.qe-history code { font-family: var(--qe-mono); font-size: 12px; }
+.qe-meta { font-size: 12px; color: var(--qe-ink-soft); }
+.qe-chip {
+  flex: none; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 650; letter-spacing: 0.03em;
+  border: 1px solid var(--qe-border); color: var(--qe-ink-soft);
+}
+.qe-chip-success { color: var(--qe-accent); border-color: var(--qe-accent); }
+.qe-chip-error, .qe-chip-blocked, .qe-chip-timeout { color: var(--qe-danger); border-color: var(--qe-danger); }
+
+/* ── modal ──────────────────────────────────────────────────────────────── */
+.qe-modal-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(9, 14, 20, 0.55);
+}
+.qe-modal {
+  width: min(540px, 100%); padding: 22px;
+  background: var(--qe-bg); border: 1px solid var(--qe-border);
+  border-top: 4px solid var(--qe-accent); border-radius: 6px;
+}
+.qe-modal h2 { margin: 0 0 8px; font-size: 16px; font-weight: 650; }
+.qe-modal p { margin: 0 0 12px; color: var(--qe-ink-soft); font-size: 13px; }
+.qe-modal label { display: block; margin-bottom: 5px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--qe-ink-soft); }
+.qe-modal pre {
+  max-height: 160px; overflow: auto; padding: 10px 12px; margin: 0 0 16px;
+  font-family: var(--qe-mono); font-size: 12px; white-space: pre-wrap; word-break: break-word;
+  background: var(--qe-panel); border: 1px solid var(--qe-border); border-radius: 4px;
+}
+.qe-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .qe-root { padding: 16px 14px 32px 18px; }
+  .qe-field, .qe-field.qe-grow { flex: 1 1 100%; min-width: 0; }
+  .qe-status-right { width: 100%; margin-left: 0; }
+  .qe-table th, .qe-table td { max-width: 180px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qe-root *, .qe-root *::before { transition: none !important; animation: none !important; }
+}

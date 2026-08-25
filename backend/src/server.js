@@ -38,6 +38,20 @@ app.use('/api', secondaryFs);
 app.use('/api', nfsRoutes);
 app.use('/api', monitoringRoutes);
 
+// ── Query Execution + Reports ───────────────────────────────────────────────
+// Isolated: a fault here must never stop backup scheduling.
+try {
+  app.use('/api/query',   require('./routes/queryRoutes'));
+  app.use('/api/reports', require('./routes/reportRoutes'));
+  console.log('[BackupVault] Query/Reports mounted');
+} catch (err) {
+  console.error('[BackupVault] Query/Reports DISABLED:', err.message);
+}
+
+
+
+
+
 app.get('/health', (req, res) => res.json({
   status: 'ok', time: new Date(),
   db_user: process.env.DB_USER, version: '1.0.0',

@@ -190,7 +190,8 @@ export default function Sidebar({ wsConnected }) {
         {navItem('/live-logs',  'terminal-2',       'Live Logs')}
         {navItem('/restore',    'database-import',  'Restore DB')}
         {navItem('/activity',   'activity',         'Activity')}
-
+        {navItem('/query',      'terminal',         'Query Execution')}
+        {navItem('/reports',    'file-spreadsheet', 'Reports')}
         {sectionLabel('Storage Tiers')}
         {navItem('/primary-dc', 'device-floppy',   'Primary DB',    primaryBadge)}
         {navItem('/secondary',  'server-2',        'Secondary DB')}
