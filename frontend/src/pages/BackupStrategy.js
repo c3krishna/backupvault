@@ -263,9 +263,9 @@ export default function BackupStrategy() {
         <Step n="3" title="Incremental Backup → Remote Onsite DR (192.168.12.243) — Rule 3 (Scripts)" bg="var(--bv-green-dim)">
           <Card icon="terminal-2" title="db-backup 10.180.0.90 — /usr/local/src/scripts_for_incremental_backup/" color="green"
             lines={[
-              'Not a second mysqldump — rsync of a staged .sql.gz from local staging to Remote, then md5 verify',
-              'BackupVault SSHes as root@10.180.0.90 (key auth) and runs the 7 wrappers every 4 hours (IST)',
-              'Logs on db-backup: /var/log/<db>-incremental.log  ·  SUCCESS line means the script finished',
+              'First time (remote file missing or size mismatch): full copy of a stable snapshot of the staged .sql.gz',
+              'Every 4 hours after that: incremental rsync — skipped when MD5 already matches',
+              'BackupVault SSHes as root@10.180.0.90 (key auth) and runs the 7 wrappers · logs /var/log/<db>-incremental.log',
             ]} />
           <Arrow label="rsync -avz --checksum over SSH · port 22" color="var(--bv-green)" />
           <Card icon="building" title="Remote Onsite DR — 192.168.12.243:/home/worktual/<db>/" color="amber"
@@ -276,7 +276,8 @@ export default function BackupStrategy() {
             ]} />
           <InfoBox color="green">
             <strong>Portal:</strong> Open <em>Incremental Backup</em> for live status, log tail, and Run now.
-            Schedule is 00:00 / 04:00 / 08:00 / 12:00 / 16:00 / 20:00 Asia/Kolkata.
+            Missing or stale files on 192.168.12.243 get a full seed first; later cycles are 4-hourly incremental rsync
+            (00:00 / 04:00 / 08:00 / 12:00 / 16:00 / 20:00 Asia/Kolkata).
           </InfoBox>
         </Step>
 

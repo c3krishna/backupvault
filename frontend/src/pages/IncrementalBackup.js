@@ -89,7 +89,7 @@ export default function IncrementalBackup() {
             Incremental Backup
           </div>
           <div style={{ fontSize:12, color:'var(--bv-txt2)', marginTop:3 }}>
-            Rule 3 — SSH to {meta?.sshTarget || 'root@10.180.0.90'} and run wrappers in {meta?.scriptsDir || '/usr/local/src/scripts_for_incremental_backup'} · rsync staged dumps to Remote Onsite
+            Rule 3 — first-time full copy of the staged dump to Remote Onsite, then rsync every 4 hours from {meta?.sshTarget || 'root@10.180.0.90'}
           </div>
         </div>
         <div style={{ display:'flex', gap:8, flexShrink:0 }}>

@@ -136,7 +136,9 @@ export const incrementalAPI = {
 function numFields(obj) {
   const NUM = ['cpu_pct','mem_pct','disk_pct','load_avg_1','load_avg_5','load_avg_15',
     'connections','queries_ps','slow_queries','db_size_mb','uptime_sec',
-    'mem_total_mb','mem_used_mb','inode_pct','disk_pct'];
+    'mem_total_mb','mem_used_mb','inode_pct','disk_pct',
+    'threads_connected','threads_running','threads_cached','qps',
+    'slave_lag_sec','innodb_bp_hit_pct','pg_connections','pg_active_queries','pg_cache_hit_pct'];
   const out = { ...obj };
   NUM.forEach(k => { if (out[k] != null) out[k] = parseFloat(out[k]); });
   return out;
@@ -151,7 +153,10 @@ export const monitoringAPI = {
       out[env] = list.map(numFields);
     return out;
   },
-  serverHistory:   (id,mins)  => r('GET',  `/monitoring/servers/${id}/history?minutes=${mins||60}`),
+  serverHistory:   async (id,mins) => {
+    const rows = await r('GET', `/monitoring/servers/${id}/history?minutes=${mins||180}`);
+    return (rows||[]).map(numFields);
+  },
   serverCollect:   async (id) => numFields(await r('POST', `/monitoring/servers/${id}/collect`)),
   serverCollectAll:()         => r('POST', '/monitoring/servers/collect-all'),
   serversList:     ()         => r('GET',  '/monitoring/servers/crud'),

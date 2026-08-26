@@ -310,6 +310,7 @@ router.get('/monitoring/servers/grouped', auth, async (req,res) => {
         CAST(n.load_avg_15     AS FLOAT)  load_avg_15,
         CAST(n.threads_connected AS SIGNED) threads_connected,
         CAST(n.threads_running   AS SIGNED) threads_running,
+        CAST(n.threads_cached    AS SIGNED) threads_cached,
         CAST(n.slow_queries      AS SIGNED) slow_queries,
         CAST(n.innodb_bp_hit_pct AS FLOAT)  innodb_bp_hit_pct,
         CAST(n.qps               AS FLOAT)  qps,
@@ -352,6 +353,9 @@ router.get('/monitoring/servers/:id/history', auth, async (req,res) => {
         CAST(disk_pct AS SIGNED) disk_pct,
         CAST(threads_connected AS SIGNED) threads_connected,
         CAST(threads_running AS SIGNED) threads_running,
+        CAST(COALESCE(threads_connected, pg_connections) AS SIGNED) connections,
+        CAST(pg_connections AS SIGNED) pg_connections,
+        CAST(pg_active_queries AS SIGNED) pg_active_queries,
         CAST(qps AS FLOAT) qps,
         CAST(slave_lag_sec AS SIGNED) slave_lag_sec,
         CAST(innodb_bp_hit_pct AS FLOAT) innodb_bp_hit_pct

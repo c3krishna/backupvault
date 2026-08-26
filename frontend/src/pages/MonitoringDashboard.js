@@ -1,10 +1,10 @@
 // frontend/src/pages/MonitoringDashboard.js
 // Physical server monitoring — grouped by host:port, environments, deep metrics + wave graphs
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import { monitoringAPI, nfsAPI } from '../services/api';
 import { Btn, Spinner, Modal, Field, toast } from '../components/UI';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
          CartesianGrid, ReferenceLine } from 'recharts';
 
 const ENV_META = {
@@ -60,24 +60,48 @@ function ReplicaBadge({ running, lagSec, ioRunning, sqlRunning }) {
   </div>;
 }
 
-function WaveGraph({ data, lines, height=70 }) {
+function WaveGraph({ data, lines, height=112 }) {
+  const gid = useId().replace(/:/g,'');
   const fmtT = v => { if(!v) return ''; const d=new Date(v); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  const rows = (data||[]).map(row => {
+    const o = { snapshot_at: row.snapshot_at };
+    for (const l of lines) {
+      const n = Number(row[l.key]);
+      o[l.key] = Number.isFinite(n) ? n : null;
+    }
+    return o;
+  });
+  const dual = lines.some(l => l.axis === 'right');
   return <ResponsiveContainer width="100%" height={height}>
-    <LineChart data={data} margin={{top:2,right:4,bottom:0,left:0}}>
+    <AreaChart data={rows} margin={{top:6,right:6,bottom:2,left:2}}>
+      <defs>
+        {lines.map(l => (
+          <linearGradient key={l.key} id={`${gid}-${l.key}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={l.color} stopOpacity={0.42}/>
+            <stop offset="100%" stopColor={l.color} stopOpacity={0.03}/>
+          </linearGradient>
+        ))}
+      </defs>
       <CartesianGrid strokeDasharray="3 3" stroke="var(--bv-bd)" vertical={false}/>
-      <XAxis dataKey="snapshot_at" hide tickFormatter={fmtT}/>
-      <YAxis domain={[0,'auto']} hide/>
+      <XAxis dataKey="snapshot_at" tickFormatter={fmtT} tick={{fill:'var(--bv-txt3)',fontSize:9}}
+        minTickGap={28} axisLine={false} tickLine={false}/>
+      <YAxis yAxisId="left" domain={[0,'auto']} hide/>
+      {dual && <YAxis yAxisId="right" orientation="right" domain={[0,'auto']} hide/>}
       <Tooltip contentStyle={{background:'var(--bv-bg2)',border:'1px solid var(--bv-bd)',borderRadius:6,fontSize:10}}
         labelFormatter={fmtT}/>
-      {lines.map(l=>(
-        <Line key={l.key} type="monotone" dataKey={l.key} stroke={l.color}
-          strokeWidth={1.5} dot={false} activeDot={{r:3}} connectNulls
-          name={l.label}/>
-      ))}
       {lines.filter(l=>l.ref).map(l=>(
-        <ReferenceLine key={l.key+'r'} y={l.ref} stroke={l.color} strokeDasharray="4 2" strokeWidth={1} opacity={0.5}/>
+        <ReferenceLine key={l.key+'r'} yAxisId={l.axis==='right'?'right':'left'} y={l.ref}
+          stroke={l.color} strokeDasharray="4 2" strokeWidth={1} opacity={0.45}/>
       ))}
-    </LineChart>
+      {lines.map(l=>(
+        <Area key={l.key} type="monotone" dataKey={l.key}
+          yAxisId={l.axis==='right'?'right':'left'}
+          stroke={l.color} strokeWidth={2}
+          fill={`url(#${gid}-${l.key})`}
+          fillOpacity={1} dot={false} activeDot={{r:3}} connectNulls
+          isAnimationActive={false} name={l.label}/>
+      ))}
+    </AreaChart>
   </ResponsiveContainer>;
 }
 
@@ -90,7 +114,7 @@ function ServerCard({ server, onCollect, collecting }) {
   const hasData = s.cpu_pct!=null || s.threads_connected!=null || s.pg_connections!=null;
 
   const loadHist = useCallback(async () => {
-    try { setHistory(await monitoringAPI.serverHistory(s.id, 60)); } catch {}
+    try { setHistory(await monitoringAPI.serverHistory(s.id, 180)); } catch {}
   }, [s.id]);
 
   useEffect(() => { if (open) loadHist(); }, [open, loadHist]);
@@ -252,37 +276,37 @@ function ServerCard({ server, onCollect, collecting }) {
       )}
 
       {/* Wave graphs */}
-      {history.length>=1 ? (
+      {history.length>=2 ? (
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           <div style={{background:'var(--bv-card)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--bv-bd)'}}>
-            <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,fontWeight:600}}>CPU & Memory % (60 min)</div>
+            <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,fontWeight:600}}>CPU & Memory % (3 hours)</div>
             <WaveGraph data={history} lines={[
-              {key:'cpu_pct',color:'var(--bv-blue)',label:'CPU %',ref:80},
-              {key:'mem_pct',color:'var(--bv-purple)',label:'Mem %',ref:85},
+              {key:'cpu_pct',color:'#58a6ff',label:'CPU %',ref:80},
+              {key:'mem_pct',color:'#a371f7',label:'Mem %',ref:85},
             ]}/>
           </div>
           <div style={{background:'var(--bv-card)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--bv-bd)'}}>
             <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,fontWeight:600}}>Disk % & Connections</div>
             <WaveGraph data={history} lines={[
-              {key:'disk_pct',color:'var(--bv-amber)',label:'Disk %',ref:80},
-              {key:'threads_connected',color:'var(--bv-cyan)',label:'Connections'},
+              {key:'disk_pct',color:'#f5a524',label:'Disk %',ref:80},
+              {key:'connections',color:'#2dd4bf',label:'Connections',axis:'right'},
             ]}/>
           </div>
           {history.some(h=>h.qps!=null) && (
             <div style={{background:'var(--bv-card)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--bv-bd)'}}>
               <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,fontWeight:600}}>QPS — Queries Per Second</div>
-              <WaveGraph data={history} lines={[{key:'qps',color:'var(--bv-green)',label:'QPS'}]}/>
+              <WaveGraph data={history} lines={[{key:'qps',color:'#3fb950',label:'QPS'}]}/>
             </div>
           )}
           {history.some(h=>h.slave_lag_sec!=null) && (
             <div style={{background:'var(--bv-card)',borderRadius:8,padding:'10px 12px',border:'1px solid var(--bv-bd)'}}>
               <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6,fontWeight:600}}>Replication Lag (seconds)</div>
-              <WaveGraph data={history} lines={[{key:'slave_lag_sec',color:'var(--bv-red)',label:'Lag(s)',ref:30}]}/>
+              <WaveGraph data={history} lines={[{key:'slave_lag_sec',color:'#f85149',label:'Lag(s)',ref:30}]}/>
             </div>
           )}
         </div>
       ) : <div style={{textAlign:'center',padding:20,color:'var(--bv-txt3)',fontSize:12}}>
-        Wave graphs appear after 2+ data collections (auto every 5 min)
+        Waveform charts appear after 2+ collections (every 5 min, or click Collect)
       </div>}
 
       {/* Load average */}
@@ -348,7 +372,7 @@ function NFSCard({ s, onCheck, checking }) {
   const icon = NFS_ROLE_META[s.role]||'server';
 
   const loadHist = useCallback(async () => {
-    try { setHist(await monitoringAPI.nfsHistory(s.id,60)); } catch {}
+    try { setHist(await monitoringAPI.nfsHistory(s.id,180)); } catch {}
   }, [s.id]);
 
   useEffect(()=>{ if(open) loadHist(); },[open,loadHist]);
@@ -381,10 +405,10 @@ function NFSCard({ s, onCheck, checking }) {
         <i className={`ti ti-chevron-${open?'up':'down'}`} style={{fontSize:14,color:'var(--bv-txt3)',padding:4,alignSelf:'center'}}/>
       </div>
     </div>
-    {open && hist.length>=1 && (
+    {open && hist.length>=2 && (
       <div style={{borderTop:'1px solid var(--bv-bd)',padding:'10px 14px',background:'var(--bv-bg3)'}}>
-        <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>Disk % — 60 min history</div>
-        <WaveGraph data={hist} lines={[{key:'disk_pct',color:col,label:'Disk %',ref:80}]}/>
+        <div style={{fontSize:10,color:'var(--bv-txt3)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>Disk % — 3 hour history</div>
+        <WaveGraph data={hist} lines={[{key:'disk_pct',color:pct>=90?'#f85149':pct>=80?'#f5a524':'#3fb950',label:'Disk %',ref:80}]}/>
       </div>
     )}
   </div>;
