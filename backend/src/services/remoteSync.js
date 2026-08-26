@@ -104,7 +104,7 @@ async function rsyncFileToRemote(runId, localFilePath, dest, logFn) {
 
   return new Promise((resolve, reject) => {
     const args = [
-      '-avz', '--progress',
+      '-avz', '--checksum', '--progress',
       '-e', 'sshpass -p "' + password + '" ssh -p ' + port + ' -o StrictHostKeyChecking=no',
       localFilePath,
       user + '@' + host + ':' + remoteDir + '/',
@@ -154,7 +154,7 @@ async function syncDirToRemote(localDir, config) {
 
   try {
     const out = execSync(
-      `rsync -avz --delete -e "sshpass -p '${password}' ssh -p ${port} -o StrictHostKeyChecking=no" ` +
+      `rsync -avz --checksum --delete -e "sshpass -p '${password}' ssh -p ${port} -o StrictHostKeyChecking=no" ` +
       `${localDir}/ ${user}@${host}:${remotePath}/`,
       { timeout: 300000, maxBuffer: 10 * 1024 * 1024 }
     ).toString();

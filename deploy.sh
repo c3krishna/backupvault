@@ -16,21 +16,38 @@ pip3 install awscli --break-system-packages 2>/dev/null || true
 
 # 2. Backend files
 echo "[2] Deploying backend..."
-mkdir -p $BACKEND/src/{routes,services,db}
+mkdir -p $BACKEND/src/{routes,services,db,controllers}
 cp backend/src/server.js            $BACKEND/src/
 cp backend/src/db/connection.js     $BACKEND/src/db/
+cp backend/src/db/ensureSchema.js   $BACKEND/src/db/
 cp backend/src/routes/api.js        $BACKEND/src/routes/
 cp backend/src/routes/auth.js       $BACKEND/src/routes/
 cp backend/src/routes/fs.js         $BACKEND/src/routes/
 cp backend/src/routes/sftp.js       $BACKEND/src/routes/
 cp backend/src/routes/secondaryfs.js $BACKEND/src/routes/
 cp backend/src/routes/infrastructure.js $BACKEND/src/routes/
+cp backend/src/routes/nfs.js            $BACKEND/src/routes/
+cp backend/src/routes/monitoring.js     $BACKEND/src/routes/
+cp backend/src/routes/queryRoutes.js    $BACKEND/src/routes/
+cp backend/src/routes/reportRoutes.js   $BACKEND/src/routes/
+cp backend/src/routes/incremental.js    $BACKEND/src/routes/
+cp backend/src/controllers/*.js         $BACKEND/src/controllers/
 cp backend/src/services/wsManager.js     $BACKEND/src/services/
 cp backend/src/services/backupEngine.js  $BACKEND/src/services/
 cp backend/src/services/scheduler.js     $BACKEND/src/services/
 cp backend/src/services/storageMonitor.js $BACKEND/src/services/
 cp backend/src/services/s3Service.js      $BACKEND/src/services/
 cp backend/src/services/remoteSync.js     $BACKEND/src/services/
+cp backend/src/services/queryService.js   $BACKEND/src/services/
+cp backend/src/services/reportService.js  $BACKEND/src/services/
+cp backend/src/services/mailService.js    $BACKEND/src/services/
+cp backend/src/services/notifier.js       $BACKEND/src/services/
+cp backend/src/services/ociService.js     $BACKEND/src/services/
+cp backend/src/services/incrementalService.js $BACKEND/src/services/
+mkdir -p $BACKEND/reports $BACKEND/tmp/query-results
+cp backend/reports/*.json $BACKEND/reports/ 2>/dev/null || true
+mkdir -p /var/www/backupvault/scripts_for_incremental_backup
+cp scripts_for_incremental_backup/*.sh  /var/www/backupvault/scripts_for_incremental_backup/
 # Only copy .env if it doesn't exist (preserve existing credentials)
 [ -f "$BACKEND/.env" ] || cp backend/.env $BACKEND/.env
 

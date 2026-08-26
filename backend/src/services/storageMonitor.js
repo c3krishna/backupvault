@@ -225,10 +225,11 @@ async function runChecks() {
     checkLocalMount('Secondary DC',     secondaryPath),
   ]);
 
-  // Auto-cleanup primary if above 90%
+  // Rule 2: never delete Primary files unless Secondary copy was verified.
+  // AUTO_CLEANUP destructive path is disabled — admins copy/verify/delete manually.
   if (primary && primary.usedPct >= THRESHOLDS.critical) {
-    const doCleanup = process.env.AUTO_CLEANUP === 'true';
-    if (doCleanup) await autoCleanup(primaryPath, 75);
+    console.warn('[StorageMonitor] Primary at ' + primary.usedPct +
+      '% — auto-delete skipped. Copy files older than 50 days to Secondary, verify, then delete.');
   }
 
   return { primary, secondary };

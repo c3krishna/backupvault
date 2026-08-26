@@ -11,9 +11,7 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/reportController');
 
-// ─── ADJUST: your existing auth middleware ──────────────────────────────────
-const authenticate = require('./auth');
-// ────────────────────────────────────────────────────────────────────────────
+const { auth: authenticate } = require('./auth');
 
 router.use(authenticate);
 router.use(express.json({ limit: '64kb' }));

@@ -172,10 +172,11 @@ export default function Jobs() {
             <Field label="Backup type">
               <select value={form.backup_type} onChange={e=>setForm(p=>({...p,backup_type:e.target.value}))} style={{width:'100%'}}>
                 <option value="full">Full</option>
-                <option value="incremental">Incremental</option>
-                <option value="differential">Differential</option>
               </select>
             </Field>
+          </div>
+          <div style={{fontSize:11,color:'var(--bv-txt3)',margin:'-4px 0 10px'}}>
+            Incremental rsync of staged dumps is on the Incremental Backup page, not this dump job.
           </div>
 
           <Field label="Schedule" hint="When this job runs automatically">

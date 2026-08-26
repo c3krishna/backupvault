@@ -13,9 +13,7 @@ const router = express.Router();
 const ctrl = require('../controllers/queryController');
 const queryService = require('../services/queryService');
 
-// ─── ADJUST: your existing auth middleware ──────────────────────────────────
-const authenticate = require('./auth');
-// ────────────────────────────────────────────────────────────────────────────
+const { auth: authenticate } = require('./auth');
 
 // Lightweight per-user throttle: 30 executions / minute. Prevents someone
 // hammering a production replica with expensive scans.

@@ -59,9 +59,16 @@ export default function NFSServers() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    (async () => {
+      setChecking(true);
+      try { setServers(await nfsAPI.checkAll()); }
+      catch { await load(); }
+      finally { setChecking(false); setLoading(false); }
+    })();
+  }, [load]);
 
-  // Auto-refresh live stats every 60s
+  // Re-read DB every 60s — live df is done by the backend scheduler
   useEffect(() => {
     const t = setInterval(async () => {
       try { setServers(await nfsAPI.list()); } catch {}
@@ -285,8 +292,8 @@ export default function NFSServers() {
             <div style={{ fontSize:11, fontWeight:600, color:'var(--bv-txt2)', marginBottom:5 }}>How monitoring works</div>
             <div style={{ fontSize:11, color:'var(--bv-txt3)', lineHeight:1.7 }}>
               Each NFS server is checked by running <code style={{ fontFamily:'monospace', color:'var(--bv-cyan)' }}>df -h</code> on
-              the local mount point. The mount must be accessible from the BackupVault server. Stats are
-              saved to DB and refreshed every 60 seconds automatically.
+              the local mount point. Live stats are collected automatically every 60 seconds by the BackupVault scheduler
+              (and once when you open this page). Use Check / Check all for an immediate refresh.
             </div>
           </div>
           <div style={{ flex:1, minWidth:200 }}>

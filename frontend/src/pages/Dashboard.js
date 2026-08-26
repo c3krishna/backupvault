@@ -1,7 +1,7 @@
 // frontend/src/pages/Dashboard.js
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardAPI, backupAPI, targetsAPI, storageAPI, infraAPI, destinationsAPI } from '../services/api';
+import { dashboardAPI, backupAPI, targetsAPI, storageAPI, infraAPI, destinationsAPI, monitoringAPI, nfsAPI } from '../services/api';
 import { StatCard, Card, Badge, Btn, Spinner, toast } from '../components/UI';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format, subDays, parseISO } from 'date-fns';
@@ -90,6 +90,9 @@ export default function Dashboard() {
   const [storStats,  setStorStats]  = useState(null);
   const [infraData,  setInfraData]  = useState(null);
   const [ociDest,    setOciDest]    = useState({});
+  const [monGroups,  setMonGroups]  = useState({});
+  const [nfsServers, setNfsServers] = useState([]);
+  const [healthAt,   setHealthAt]   = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [trigTarget, setTrigTarget] = useState('all');
   const [trigType,   setTrigType]   = useState('full');
@@ -105,11 +108,13 @@ export default function Dashboard() {
       setStats(s); setCalendar(c); setRecent(r.slice(0,8)); setTargets(t);
       // Load storage + infra in background (non-blocking)
       storageAPI.stats().then(setStorStats).catch(()=>{});
-      infraAPI.health().then(setInfraData).catch(()=>{});
+      infraAPI.health().then(h => { setInfraData(h); setHealthAt(h?.checked_at || new Date().toISOString()); }).catch(()=>{});
       destinationsAPI.list().then(list => {
         const oci = (list||[]).find(d => d.dest_type==='oci_object' && d.is_active);
         if (oci) setOciDest(oci);
       }).catch(()=>{});
+      monitoringAPI.serversGrouped().then(setMonGroups).catch(()=>{});
+      nfsAPI.list().then(setNfsServers).catch(()=>{});
     } catch(e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
@@ -132,6 +137,19 @@ export default function Dashboard() {
     return { date:format(parseISO(d),'MMM d'), success:found?.success||0, partial:found?.partial||0, failed:found?.failed||0 };
   });
 
+  function exportRecent() {
+    const header = ['id','target','status','backup_type','started_at','file_size_bytes'];
+    const lines = [header.join(',')].concat(
+      (recent||[]).map(r => [r.id, r.target_name, r.status, r.backup_type, r.started_at, r.file_size_bytes]
+        .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','))
+    );
+    const blob = new Blob([lines.join('\n')], { type:'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `backupvault-recent-${format(new Date(),'yyyy-MM-dd')}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const today    = stats?.today?.[0] || {};
   const storage  = storStats?.byTarget || [];
   const primary  = infraData?.storage?.primary || {};
@@ -142,9 +160,23 @@ export default function Dashboard() {
   // backupPct = actual backup files % (shown as informational)
   const primaryPct    = parseInt(primary?.diskPct || primary?.usedPct || 0);
   const primaryBkPct  = parseInt(primary?.backupPct || primaryPct);
+  const secondary     = infraData?.storage?.secondary || {};
+  const secondaryPct  = parseInt(secondary?.diskPct || secondary?.usedPct || 0);
   const remoteData  = remote[0] || {};
+  const remotePct   = parseInt(remoteData?.disk?.usePercent) || 0;
   const s3Data      = s3List[0] || {};
   const ociData     = ociDest || {};
+  const nfsOffline  = nfsServers.filter(s => s.status==='offline').length;
+  const nfsCrit     = nfsServers.filter(s => s.status==='critical').length;
+  const nfsWarn     = nfsServers.filter(s => s.status==='warn').length;
+  const monServers  = Object.values(monGroups||{}).flat();
+  const systemsOk   = (today.failed||0)===0 && nfsCrit===0 && nfsOffline===0 && primaryPct<90;
+  const lastSyncLabel = healthAt
+    ? format(new Date(healthAt), 'HH:mm:ss')
+    : (nfsServers.find(s=>s.last_check)?.last_check ? format(new Date(nfsServers.find(s=>s.last_check).last_check), 'HH:mm:ss') : '—');
+  function monForTarget(t) {
+    return monServers.find(s => String(s.host)===String(t.host) && Number(s.port)===Number(t.port));
+  }
 
   const sel = { fontSize:12, padding:'6px 10px', background:C.bg3, border:`1px solid ${C.bd2}`, color:C.txt, borderRadius:8 };
   const th  = { textAlign:'left',fontSize:10,color:C.txt3,fontWeight:600,letterSpacing:'.07em',textTransform:'uppercase',padding:'6px 10px',borderBottom:`1px solid ${C.bd}` };
@@ -158,14 +190,22 @@ export default function Dashboard() {
         <div>
           <div style={{fontSize:20,fontWeight:500,color:C.txt}}>Dashboard</div>
           <div style={{fontSize:12,color:C.txt2,marginTop:3}}>
-            Multi-tier protection · 5 live DB servers → Primary DB → Secondary → Remote → AWS S3 ·{' '}
-            <span style={{color:C.green,fontWeight:500}}>All systems healthy</span>
+            Multi-tier protection · Live DB servers → Primary DB → Secondary → Remote → AWS S3 ·{' '}
+            <span style={{color:systemsOk?C.green:C.amber,fontWeight:500}}>
+              {systemsOk ? 'All systems healthy' : [
+                today.failed>0 && `${today.failed} backup fail`,
+                nfsCrit>0 && `${nfsCrit} NFS critical`,
+                nfsOffline>0 && `${nfsOffline} NFS offline`,
+                primaryPct>=90 && `Primary ${primaryPct}%`,
+                nfsWarn>0 && `${nfsWarn} NFS warn`,
+              ].filter(Boolean).join(' · ') || 'Check monitoring'}
+            </span>
           </div>
         </div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <span style={{fontSize:11,color:C.txt3}}>Last sync: 2 min ago</span>
+          <span style={{fontSize:11,color:C.txt3}}>Last check: {lastSyncLabel}</span>
           <Btn variant="ghost" icon="refresh" size="sm" onClick={load}>Refresh</Btn>
-          <Btn variant="ghost" icon="download" size="sm">Export</Btn>
+          <Btn variant="ghost" icon="download" size="sm" onClick={exportRecent}>Export</Btn>
           <Btn variant="primary" icon="player-play" loading={triggering} onClick={handleTrigger} size="sm">Run all backups</Btn>
         </div>
       </div>
@@ -179,7 +219,7 @@ export default function Dashboard() {
           </div>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:500,color:C.txt,marginBottom:2}}>Initiate Backup</div>
-            <div style={{fontSize:12,color:C.txt2}}>Rule 4 — On-demand: stored to Primary DB + Remote Onsite + S3 (if enabled)</div>
+            <div style={{fontSize:12,color:C.txt2}}>Rule 4 — On-demand full dump: stored to Primary DB + Remote Onsite + S3 (if enabled). Incremental rsync lives under Incremental Backup.</div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,flexWrap:'wrap'}}>
             <select value={trigTarget} onChange={e=>setTrigTarget(e.target.value)} style={sel}>
@@ -188,7 +228,6 @@ export default function Dashboard() {
             </select>
             <select value={trigType} onChange={e=>setTrigType(e.target.value)} style={sel}>
               <option value="full">Full Backup</option>
-              <option value="incremental">Incremental</option>
             </select>
             <Btn variant="primary" icon="player-play" loading={triggering} onClick={handleTrigger}>Start Backup</Btn>
           </div>
@@ -197,12 +236,12 @@ export default function Dashboard() {
         {/* KPI Row */}
         {loading ? <div style={{display:'flex',justifyContent:'center',padding:40}}><Spinner/></div> : (
           <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:10}}>
-            <StatCard label="Live DB servers"  value={stats?.targets||0}            sub="All reachable"      accent="blue"   color="blue"/>
+            <StatCard label="Live DB servers"  value={stats?.targets||0}            sub={monServers.length?`${monServers.filter(s=>s.last_status==='ok'||s.last_status==='online').length} monitored`:'Configured targets'}      accent="blue"   color="blue"/>
             <StatCard label="Today's runs"     value={today.total_runs||0}          sub={`${today.success||0} success · ${today.failed||0} fail`} color="green" accent="green"/>
             <StatCard label="Backup failures"  value={today.failed||0}              sub="Last 30 days"       color={today.failed>0?'red':'white'} accent="red"/>
             <StatCard label="Primary DB (NFS)" value={primaryPct?`${primaryPct}%`:'—'} sub={`${primary?.diskUsedHuman||primary?.usedHuman||'—'} / ${primary?.totalHuman||'—'} · backup: ${primaryBkPct}%`} color={primaryPct>=80?'amber':'white'} accent="amber"/>
             <StatCard label="Data backed up"   value={fmtBytes(today.total_bytes)}  sub="All destinations"   accent="blue"/>
-            <StatCard label="Remote Onsite"    value={remoteData?.disk?.usePercent||'—'} sub={`${remoteData?.disk?.used||'—'} / ${remoteData?.disk?.size||'—'} · 192.168.12.243`} color={parseInt(remoteData?.disk?.usePercent)>=80?'amber':'white'} accent="cyan"/>
+            <StatCard label="Remote Onsite"    value={remotePct?`${remotePct}%`:(remoteData?.disk?.usePercent||'—')} sub={`${remoteData?.disk?.used||'—'} / ${remoteData?.disk?.size||'—'} · 192.168.12.243`} color={remotePct>=80?'amber':'white'} accent="cyan"/>
             <StatCard label="AWS S3 stored"    value={s3Data?.bucketSize||'—'} sub={s3Data?.objectCount ? `${s3Data.objectCount.toLocaleString()} objects · ${s3Data.region||''}` : 'STANDARD_IA'} color={s3Data?.status==='connected'?'white':'amber'} accent="purple"/>
           </div>
         )}
@@ -255,21 +294,22 @@ export default function Dashboard() {
               <SBar pct={primaryPct}/>
               <div style={{fontSize:10,color:C.txt3}}>{primary?.usedHuman||'—'} used · {primary?.freeHuman||'—'} free · {primary?.usedPct||'—'}</div>
               {primaryPct>=80 && <div style={{marginTop:6,fontSize:11,color:C.amber,background:C.amberBg,padding:'4px 8px',borderRadius:5}}>
-                Rule 2: Move data older than 1 month to Secondary DB
+                Rule 2: Move data older than 50 days to Secondary DB
               </div>}
             </div>
 
             {/* Secondary DB */}
-            <div style={{border:`1px solid ${C.bd}`,borderRadius:8,padding:'10px 12px',marginBottom:8,background:'var(--bv-green-dim)22'}}>
+            <div style={{border:`1px solid ${secondaryPct>=80?'var(--bv-amber)':C.bd}`,borderRadius:8,padding:'10px 12px',marginBottom:8,background:'var(--bv-green-dim)22'}}>
               <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
                 <i className="ti ti-server-2" style={{fontSize:15,color:C.cyan}}/>
                 <div style={{flex:1}}>
                   <div style={{fontSize:12,fontWeight:500,color:C.txt}}>Secondary DB (rsync mirror)</div>
                   <div style={{fontSize:10,color:C.cyan,fontFamily:'monospace'}}>/secondary-db-backup · 10.180.0.130</div>
                 </div>
+                <RuleTag type={secondaryPct>=80?'alert':'ok'}>{secondaryPct?`${secondaryPct}%`:'—'}</RuleTag>
               </div>
-              <SBar pct={38}/>
-              <div style={{fontSize:10,color:C.txt3}}>Rule 2: manual target when Primary {'>'} 80%</div>
+              <SBar pct={secondaryPct||0}/>
+              <div style={{fontSize:10,color:C.txt3}}>{secondary?.diskUsedHuman||secondary?.usedHuman||'—'} used · {secondary?.freeHuman||'—'} free · Rule 2: manual when Primary {'>'} 80%</div>
             </div>
 
             {/* Remote Onsite */}
@@ -282,8 +322,8 @@ export default function Dashboard() {
                 </div>
                 <RuleTag type="auto">Rule 3</RuleTag>
               </div>
-              <SBar pct={parseInt(remoteData?.disk?.usePercent)||52}/>
-              <div style={{fontSize:10,color:C.txt3}}>52% used · Incremental auto-sync + on-demand</div>
+              <SBar pct={remotePct}/>
+              <div style={{fontSize:10,color:C.txt3}}>{remotePct?`${remotePct}% used`:'Usage unknown'} · Incremental scripts + on-demand rsync</div>
             </div>
 
             {/* S3 */}
@@ -382,7 +422,7 @@ export default function Dashboard() {
                   <i className="ti ti-alert-triangle" style={{color:C.amber,fontSize:15,flexShrink:0,marginTop:1}}/>
                   <div style={{flex:1,fontSize:11.5,color:C.txt}}>
                     <strong>Primary DB NFS disk at {primaryPct}%</strong> — Rule 2 triggered<br/>
-                    <span style={{fontSize:10,color:C.txt2}}>Move {'>'} 1 month old data to Secondary DB (10.180.0.130)</span>
+                    <span style={{fontSize:10,color:C.txt2}}>Move {'>'} 50 days old data to Secondary DB (10.180.0.130)</span>
                   </div>
                 </div>
               )}
@@ -409,7 +449,7 @@ export default function Dashboard() {
               {[
                 ['1','Daily scheduled 03:00 IST: all DBs → Primary DB','auto'],
                 ['2','Primary DB >80%: notify admin, move old data → Secondary','alert'],
-                ['3','Incremental auto-sync → Remote Onsite (both sides same)','auto'],
+                ['3','Incremental rsync scripts → Remote Onsite (Incremental Backup menu)','auto'],
                 ['4','On-demand from dashboard → Primary + Remote + S3','manual'],
                 ['5','Monitor: all DB servers, Remote Onsite disk, S3 usage','ok'],
                 ['6','Email notification on backup failure → all admin users','ok'],
@@ -434,6 +474,9 @@ export default function Dashboard() {
           <Card title="DB server utilization" action={<RuleTag type="ok">Rule 5</RuleTag>}>
             {targets.filter(t=>t.is_active).map(t=>{
               const bkp = storage.find(s=>s.name===t.name);
+              const mon = monForTarget(t);
+              const st  = mon?.last_status;
+              const dot = st==='critical'?'var(--bv-red)':st==='warn'?'var(--bv-amber)':st==='offline'?'var(--bv-red)':C.green;
               return (
                 <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:`1px solid ${C.bd}`}}>
                   <div style={{
@@ -450,7 +493,7 @@ export default function Dashboard() {
                     <div style={{fontSize:11,color:C.txt2}}>{bkp?fmtBytes(bkp.total_bytes):'0 B'}</div>
                     <div style={{fontSize:10,color:C.txt3}}>{bkp?.run_count||0} runs/30d</div>
                   </div>
-                  <div style={{width:6,height:6,borderRadius:'50%',background:C.green,flexShrink:0}}/>
+                  <div style={{width:6,height:6,borderRadius:'50%',background:dot,flexShrink:0}}/>
                 </div>
               );
             })}

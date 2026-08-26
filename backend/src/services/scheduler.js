@@ -104,6 +104,19 @@ class Scheduler {
     this.systemTasks.push(remoteTask);
     console.log('[Scheduler] Remote DR health check → every 15 min');
 
+    // 3b. NFS live disk check — every minute (feeds NFS menu + monitoring graphs)
+    const nfsTask = cron.schedule('* * * * *', async () => {
+      try {
+        const nfsRoutes = require('../routes/nfs');
+        const results = await nfsRoutes.checkAllLive();
+        console.log(`[Scheduler] NFS live check — ${results.length} servers`);
+      } catch (err) {
+        console.error('[Scheduler] NFS check error:', err.message);
+      }
+    });
+    this.systemTasks.push(nfsTask);
+    console.log('[Scheduler] NFS live check → every 60s');
+
     // 4. Run initial checks immediately at startup (after 10s delay)
     setTimeout(async () => {
       console.log('[Scheduler] Running startup health checks...');
@@ -111,6 +124,12 @@ class Scheduler {
         await storageMonitor.runChecks();
         await s3Service.checkAllS3Destinations();
         await remoteSync.checkAllRemoteDestinations();
+        try {
+          const nfsRoutes = require('../routes/nfs');
+          await nfsRoutes.checkAllLive();
+        } catch (nfsErr) {
+          console.error('[Scheduler] Startup NFS check error:', nfsErr.message);
+        }
         console.log('[Scheduler] Startup health checks complete');
       } catch (err) {
         console.error('[Scheduler] Startup check error:', err.message);

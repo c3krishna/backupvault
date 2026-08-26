@@ -76,6 +76,35 @@ async function getLiveStats(server) {
   return stats;
 }
 
+async function persistStats(server, stats) {
+  await db.query(
+    `UPDATE nfs_servers SET status=?,disk_size=?,disk_used=?,disk_avail=?,disk_pct=?,
+     inode_pct=?,last_check=NOW(),last_error=? WHERE id=?`,
+    [stats.status, stats.disk_size||null, stats.disk_used||null, stats.disk_avail||null,
+     stats.disk_pct||null, stats.inode_pct||null, stats.last_error||null, server.id]
+  );
+  try {
+    await db.pool.execute(
+      `INSERT INTO nfs_monitoring_snapshots (server_id, disk_pct, inode_pct, status, snapshot_at)
+       VALUES (?,?,?,?,NOW())`,
+      [server.id, stats.disk_pct ?? null, stats.inode_pct ?? null, stats.status]
+    );
+  } catch (e) {
+    console.warn('[NFS] snapshot insert skipped:', e.message);
+  }
+}
+
+async function checkAllLive() {
+  const servers = await db.query('SELECT * FROM nfs_servers WHERE is_active=1');
+  const results = [];
+  for (const server of servers) {
+    const stats = await getLiveStats(server);
+    await persistStats(server, stats);
+    results.push({ ...server, ...stats, last_check: new Date() });
+  }
+  return results;
+}
+
 // ── ROUTES ────────────────────────────────────────────────────────────────────
 
 // GET /api/nfs — list all NFS servers
@@ -127,15 +156,7 @@ router.get('/nfs/:id/check', auth, async (req, res) => {
     if (!server) return res.status(404).json({ error: 'Not found' });
 
     const stats = await getLiveStats(server);
-
-    // Save to DB
-    await db.query(
-      `UPDATE nfs_servers SET status=?,disk_size=?,disk_used=?,disk_avail=?,disk_pct=?,
-       inode_pct=?,last_check=NOW(),last_error=? WHERE id=?`,
-      [stats.status, stats.disk_size||null, stats.disk_used||null, stats.disk_avail||null,
-       stats.disk_pct||null, stats.inode_pct||null, stats.last_error||null, server.id]
-    );
-
+    await persistStats(server, stats);
     res.json({ ...server, ...stats });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -143,22 +164,11 @@ router.get('/nfs/:id/check', auth, async (req, res) => {
 // GET /api/nfs/check-all — live check all NFS servers
 router.get('/nfs/check-all', auth, async (req, res) => {
   try {
-    const servers = await db.query('SELECT * FROM nfs_servers WHERE is_active=1');
-    const results = [];
-
-    for (const server of servers) {
-      const stats = await getLiveStats(server);
-      await db.query(
-        `UPDATE nfs_servers SET status=?,disk_size=?,disk_used=?,disk_avail=?,disk_pct=?,
-         inode_pct=?,last_check=NOW(),last_error=? WHERE id=?`,
-        [stats.status, stats.disk_size||null, stats.disk_used||null, stats.disk_avail||null,
-         stats.disk_pct||null, stats.inode_pct||null, stats.last_error||null, server.id]
-      );
-      results.push({ ...server, ...stats });
-    }
-
+    const results = await checkAllLive();
     res.json(results);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
+module.exports.checkAllLive = checkAllLive;
+module.exports.getLiveStats = getLiveStats;

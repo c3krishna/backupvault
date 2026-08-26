@@ -22,6 +22,7 @@ import RestoreDB from './pages/RestoreDB';
 import NFSServers from './pages/NFSServers';
 import MonitoringDashboard from './pages/MonitoringDashboard';
 import ActivityCenter from './pages/ActivityCenter';
+import IncrementalBackup from './pages/IncrementalBackup';
 import QueryExecution from './pages/QueryExecution';
 import ReportRunner   from './pages/ReportRunner';
 import { StoragePage, PrimaryDCPage, SecondaryDCPage, SettingsPage, UsersPage } from './pages/Storage';
@@ -106,6 +107,7 @@ function Layout() {
             <Route path="/monitoring"     element={<MonitoringDashboard/>}/>
             <Route path="/activity"      element={<ActivityCenter/>}/>
             <Route path="/jobs"         element={<Jobs/>}/>
+            <Route path="/incremental"  element={<IncrementalBackup/>}/>
             <Route path="/destinations" element={<Destinations/>}/>
             <Route path="/primary-dc"   element={<PrimaryDCPage/>}/>
             <Route path="/secondary"    element={<SecondaryDCPage/>}/>
@@ -119,8 +121,8 @@ function Layout() {
             <Route path="/users"        element={<UsersPage/>}/>
             <Route path="/settings"     element={<SettingsPage/>}/>
             <Route path="/strategy"     element={<BackupStrategy/>}/>
-	  <Route path="/query"   element={<QueryExecution />} />
-<Route path="/reports" element={<ReportRunner />} /> 	
+            <Route path="/query"        element={<QueryExecution/>}/>
+            <Route path="/reports"      element={<ReportRunner/>}/>
             <Route path="*"             element={<Navigate to="/dashboard" replace/>}/>
           </Routes>
         </div>

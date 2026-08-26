@@ -451,6 +451,11 @@ export default function MonitoringDashboard() {
   const online = allServers.filter(s=>s.last_status==='ok'||s.last_status==='online'||!s.last_status).length;
   const warn   = allServers.filter(s=>s.last_status==='warn').length;
   const crit   = allServers.filter(s=>s.last_status==='critical').length;
+  const lastCollect = allServers.reduce((m,s) => {
+    if (!s.snapshot_at) return m;
+    const t = new Date(s.snapshot_at);
+    return !m || t > m ? t : m;
+  }, null);
   const nfsGroups = {};
   nfs.forEach(s=>{ const r=s.role||'other'; if(!nfsGroups[r]) nfsGroups[r]=[]; nfsGroups[r].push(s); });
 
@@ -468,11 +473,18 @@ export default function MonitoringDashboard() {
             <span style={{color:'var(--bv-green)'}}>{online} OK</span>
             {warn>0&&<span style={{color:'var(--bv-amber)'}}>{warn} warn</span>}
             {crit>0&&<span style={{color:'var(--bv-red)'}}>{crit} critical</span>}
-            {lastRef.current&&<span style={{color:'var(--bv-txt3)'}}>· {lastRef.current.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+            {lastCollect&&<span style={{color:'var(--bv-txt3)'}}>· last collect {lastCollect.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
+            {lastRef.current&&<span style={{color:'var(--bv-txt3)'}}>· refreshed {lastRef.current.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span>}
           </div>
         </div>
         <div style={{display:'flex',gap:8}}>
           {tab==='db'&&<Btn variant="ghost" icon="refresh" loading={collAll} onClick={handleCollectAll}>Collect All</Btn>}
+          {tab==='nfs'&&<Btn variant="ghost" icon="refresh" loading={!!checkNfs} onClick={async()=>{
+            setCheckNfs('all');
+            try { setNfs(await nfsAPI.checkAll()); toast('All NFS servers checked'); }
+            catch(e){ toast(e.message,'error'); }
+            finally { setCheckNfs(null); }
+          }}>Check all NFS</Btn>}
           <Btn variant="primary" icon="plus" onClick={()=>setAddModal(true)}>Add Server</Btn>
           <Btn variant="ghost"   icon="refresh" onClick={load}>Refresh</Btn>
         </div>

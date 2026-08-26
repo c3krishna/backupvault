@@ -85,12 +85,42 @@ router.delete('/targets/:id', auth, requireRole('super_admin','admin'), async (r
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/targets/:id/test', async (req, res) => {
-  await new Promise(r => setTimeout(r, 800 + Math.random()*400));
-  const ok = Math.random() > 0.1;
-  res.json(ok
-    ? { success:true, message:'Connection successful', latency_ms: Math.floor(Math.random()*30)+2 }
-    : { success:false, message:'Connection refused: host unreachable' });
+router.post('/targets/:id/test', auth, async (req, res) => {
+  try {
+    const t = await db.queryOne('SELECT * FROM backup_targets WHERE id=?', [req.params.id]);
+    if (!t) return res.status(404).json({ success: false, message: 'Target not found' });
+    const t0 = Date.now();
+    if (t.db_type === 'mysql') {
+      const mysql = require('mysql2/promise');
+      const conn = await mysql.createConnection({
+        host: t.host, port: t.port || 3306, user: t.username, password: t.password,
+        database: t.database_name || undefined, connectTimeout: 8000,
+      });
+      await conn.query('SELECT 1');
+      await conn.end();
+    } else if (t.db_type === 'postgresql') {
+      const { Client } = require('pg');
+      const c = new Client({
+        host: t.host, port: t.port || 5432, user: t.username, password: t.password,
+        database: t.database_name || 'postgres', connectionTimeoutMillis: 8000,
+      });
+      await c.connect();
+      await c.query('SELECT 1');
+      await c.end();
+    } else if (t.db_type === 'redis') {
+      const { execSync } = require('child_process');
+      const out = execSync(
+        `redis-cli -h '${t.host}' -p ${t.port || 6379} ping`,
+        { timeout: 8000 }
+      ).toString().trim();
+      if (out !== 'PONG') throw new Error('Redis did not reply PONG');
+    } else {
+      throw new Error('Unsupported db_type: ' + t.db_type);
+    }
+    res.json({ success: true, message: 'Connection successful', latency_ms: Date.now() - t0 });
+  } catch (e) {
+    res.json({ success: false, message: (e.message || 'Connection failed').substring(0, 240) });
+  }
 });
 
 // ── JOBS ─────────────────────────────────────────────────────────────────────

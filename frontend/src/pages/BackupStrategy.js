@@ -226,7 +226,7 @@ export default function BackupStrategy() {
             lines={[
               'Runs df on /primary-db-backup every 30 min',
               'Alert at 80% → email admins + dashboard badge',
-              'Block new backups at 90%',
+              'New dumps are blocked at 90% until space is freed',
             ]} />
           <Arrow label="≥ 80% detected" color="var(--bv-amber)" />
           <Card icon="bell" title="Admin notification sent immediately" color="amber"
@@ -260,23 +260,23 @@ export default function BackupStrategy() {
         </Step>
 
         {/* ── STEP 3 ── */}
-        <Step n="3" title="Incremental Backup → Remote Onsite DR (192.168.12.243) — Rule 3 (Automated)" bg="var(--bv-green-dim)">
-          <Card icon="device-floppy" title="Primary DB — detects changed files since last sync" color="green"
+        <Step n="3" title="Incremental Backup → Remote Onsite DR (192.168.12.243) — Rule 3 (Scripts)" bg="var(--bv-green-dim)">
+          <Card icon="terminal-2" title="scripts_for_incremental_backup/ — 7 per-DB rsync wrappers" color="green"
             lines={[
-              'rsync --checksum compares file hashes — only transfers changed blocks',
-              'Triggered automatically after each Rule 1 daily backup completes',
-              'Also runs after every on-demand backup (Rule 4)',
+              'Not a second mysqldump — rsync of a staged .sql.gz to Remote, then md5 verify',
+              'Logs: /var/log/<db>-incremental.log  ·  SUCCESS line means the script finished',
+              'Status and log tail: Incremental Backup menu in this portal',
             ]} />
-          <Arrow label="rsync over SSH · sshpass · port 22" color="var(--bv-green)" />
-          <Card icon="building" title="Remote Onsite DR — 192.168.12.243:/backups/remote" color="amber"
+          <Arrow label="rsync -avz --checksum over SSH · port 22" color="var(--bv-green)" />
+          <Card icon="building" title="Remote Onsite DR — 192.168.12.243:/home/worktual/<db>/" color="amber"
             lines={[
-              'Same folder structure: /backups/remote/<db>/Backup_DB/<YYYYMMDD>/',
-              '1TB pool · 52% used · SFTP browser available in this portal',
-              'Both sides identical after sync completes',
+              'ccaas, ccaas_ai, ai_worktual_crm, unifiedring, marketing_automation, audracare, whatsappcampaign',
+              'Lock files in /tmp/<db>_db_sync.lock — exit 2 if already running',
+              'On-demand full dumps still rsync to /backups/remote via BackupVault engine',
             ]} />
           <InfoBox color="green">
-            <strong>Recovery:</strong> Any backup file can be downloaded from the portal via
-            <em> Remote Onsite → SFTP File Explorer</em>. No SSH access required.
+            <strong>Portal:</strong> Open <em>Incremental Backup</em> to see whether each script last succeeded
+            and to read the log. Missing log = not executed yet on this host.
           </InfoBox>
         </Step>
 
@@ -285,7 +285,7 @@ export default function BackupStrategy() {
           <Card icon="player-play" title="Dashboard → Start Backup button" color="blue"
             lines={[
               'Select target: single DB server OR All Targets at once',
-              'Select type: Full Backup or Incremental',
+              'Select type: Full Backup (dumps). Incremental rsync is the Incremental Backup menu',
               'Live progress shown in WebSocket log panel (Live Logs page)',
             ]} />
           <Arrow label="transfers to all active destinations in parallel" color="var(--bv-blue)" />
@@ -324,8 +324,8 @@ export default function BackupStrategy() {
               policy="Long-term archive"
               detail="Manual copies from Primary DB (Rule 2). No auto-delete. Kept indefinitely."/>
             <TierCard icon="building"      title="Remote Onsite" color="amber"
-              policy="Mirror of Primary DB"
-              detail="Incremental sync after each backup run. Always same file set as Primary DB."/>
+              policy="Mirror + incremental scripts"
+              detail="Full dumps rsync after each BackupVault run. Per-DB incremental scripts sync staged files to /home/worktual/<db>/."/>
             <TierCard icon="brand-aws"     title="AWS S3"        color="purple"
               policy="90 days → Glacier"
               detail="STANDARD_IA for 90 days, then auto-transitioned to Glacier Deep Archive."/>
@@ -338,7 +338,7 @@ export default function BackupStrategy() {
             textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 2 }}>
             Automated monitoring (Rule 5)
           </div>
-          <RuleRow n="5a" text="Every 30 min: check disk usage on Primary DB, Secondary DB, Remote Onsite — alert at 80%, block at 90%" tag="Auto" tagColor="blue"/>
+          <RuleRow n="5a" text="Every 60s: live df on NFS servers. Every 30 min: Primary/Secondary disk — alert at 80%, block new dumps at 90%" tag="Auto" tagColor="blue"/>
           <RuleRow n="5b" text="Every 15 min: test AWS S3 connectivity — auto-deactivate destination if bucket unreachable or credentials fail" tag="Auto" tagColor="blue"/>
           <RuleRow n="5c" text="DB server reachability check before each backup — skip and log if server offline" tag="Auto" tagColor="blue"/>
 

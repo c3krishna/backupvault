@@ -17,7 +17,7 @@ import './QueryExecution.css';
 const API_BASE = process.env.REACT_APP_API_BASE || '/api';
 
 function authHeaders() {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('bv_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -27,9 +27,14 @@ async function api(path, options = {}) {
     ...options,
     headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) },
   });
+  if (res.status === 401) {
+    localStorage.removeItem('bv_token');
+    window.location.href = '/login';
+    throw new Error('Session expired');
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.success === false) {
-    const err = new Error(body.message || `Request failed (${res.status})`);
+    const err = new Error(body.message || body.error || `Request failed (${res.status})`);
     err.code = body.code;
     err.status = res.status;
     throw err;
@@ -142,9 +147,24 @@ export default function QueryExecution() {
     if (result?.executionId) goToPage(1, size);
   };
 
-  const downloadCsv = () => {
+  const downloadCsv = async () => {
     if (!result?.executionId) return;
-    window.open(`${API_BASE}/query/${result.executionId}/export.csv`, '_blank');
+    try {
+      const res = await fetch(`${API_BASE}/query/${result.executionId}/export.csv`, {
+        credentials: 'include',
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `query-${String(result.executionId).slice(0, 8)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   /* ── Ctrl/Cmd + Enter to run ───────────────────────────────────────────── */

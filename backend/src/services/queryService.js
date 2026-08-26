@@ -48,7 +48,17 @@ const __bvNormalise = (r) => (Array.isArray(r) && Array.isArray(r[0]) ? r : [r |
 const appDb = { query: async (sql, params) => __bvNormalise(await __bvPool.query(sql, params)) };
 // ────────────────────────────────────────────────────────────────────────────
 
-const CACHE_DIR      = process.env.QUERY_CACHE_DIR || '/var/www/backupvault/backend/tmp/query-results';
+const CACHE_DIR = (() => {
+  const preferred = process.env.QUERY_CACHE_DIR || path.join(__dirname, '..', '..', 'tmp', 'query-results');
+  try {
+    fs.mkdirSync(preferred, { recursive: true, mode: 0o700 });
+    return preferred;
+  } catch {
+    const fb = path.join(__dirname, '..', '..', 'tmp', 'query-results');
+    try { fs.mkdirSync(fb, { recursive: true, mode: 0o700 }); } catch {}
+    return fb;
+  }
+})();
 const CACHE_TTL_MS   = Number(process.env.QUERY_CACHE_TTL_MIN || 15) * 60 * 1000;
 const MAX_ROWS       = Number(process.env.QUERY_MAX_ROWS      || 50000);
 const QUERY_TIMEOUT  = Number(process.env.QUERY_TIMEOUT_MS    || 30000);
@@ -281,14 +291,14 @@ function resolveSecret(stored, targetName) {
 const REGISTRY_SQL = `
   SELECT bt.id                                       AS id,
          bt.name                                     AS name,
-         CASE WHEN bt.environment IN ('live','pre_production')
+         CASE WHEN COALESCE(bt.environment, 'qa') IN ('live','pre_production')
               THEN 'LIVE' ELSE 'QA' END              AS environment,
-         bt.environment                              AS env_label,
+         COALESCE(bt.environment, 'qa')              AS env_label,
          bt.db_type                                  AS db_engine,
          COALESCE(bt.query_host, bt.host)            AS host,
          COALESCE(bt.query_port, bt.port)            AS port,
          bt.database_name                            AS db_name,
-         bt.query_enabled                            AS query_enabled,
+         COALESCE(bt.query_enabled, 1)               AS query_enabled,
          COALESCE(bt.query_user, bt.username)        AS query_user,
          COALESCE(bt.query_pass_enc, bt.password)    AS query_pass_enc
     FROM backup_targets bt

@@ -125,6 +125,12 @@ export const nfsAPI = {
   checkAll: ()   => r('GET',    '/nfs/check-all'),
 };
 
+export const incrementalAPI = {
+  jobs: ()            => r('GET',  '/incremental/jobs'),
+  log:  (id, tail=200)=> r('GET',  `/incremental/jobs/${id}/log?tail=${tail}`),
+  run:  (id)          => r('POST', `/incremental/jobs/${id}/run`),
+};
+
 // Coerce MySQL decimal/int strings to JS numbers
 function numFields(obj) {
   const NUM = ['cpu_pct','mem_pct','disk_pct','load_avg_1','load_avg_5','load_avg_15',

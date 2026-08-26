@@ -186,6 +186,7 @@ export default function Sidebar({ wsConnected }) {
         {navItem('/nfs-servers', 'server-bolt',      'NFS Servers',  nfsBadge)}
         {navItem('/monitoring',  'activity',         'Monitoring')}
         {navItem('/jobs',       'list-check',       'Backup Jobs')}
+        {navItem('/incremental','layers-difference','Incremental Backup')}
         {navItem('/history',    'history',          'Run History')}
         {navItem('/live-logs',  'terminal-2',       'Live Logs')}
         {navItem('/restore',    'database-import',  'Restore DB')}

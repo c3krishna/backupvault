@@ -241,6 +241,19 @@ class BackupEngine {
     await this.updateRunStatus(runId, 'running');
 
     try {
+      var primaryMount = process.env.PRIMARY_MOUNT || '/primary-db-backup';
+      try {
+        var dfOut = execSync("df -h '" + primaryMount + "' 2>/dev/null").toString().split('\n');
+        if (dfOut[1]) {
+          var diskPct = parseInt(dfOut[1].replace(/\s+/g, ' ').split(' ')[4]) || 0;
+          if (diskPct >= 90) {
+            throw new Error('Primary NFS at ' + diskPct + '% — new backups blocked until space is freed (Rule 2)');
+          }
+        }
+      } catch (diskErr) {
+        if (String(diskErr.message || '').indexOf('blocked') !== -1) throw diskErr;
+      }
+
       // Always load ALL active destinations from DB
       // Never rely on passed IDs — they may be stale from old job configs
       var destList = await db.query('SELECT * FROM backup_destinations WHERE is_active = 1 ORDER BY id ASC');

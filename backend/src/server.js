@@ -15,6 +15,7 @@ const sftpRoutes  = require('./routes/sftp');
 const secondaryFs = require('./routes/secondaryfs');
 const nfsRoutes        = require('./routes/nfs');
 const monitoringRoutes = require('./routes/monitoring');
+const incrementalRoutes = require('./routes/incremental');
 
 console.log('[BackupVault] DB:', process.env.DB_USER, '@', process.env.DB_HOST, '/', process.env.DB_NAME);
 
@@ -37,6 +38,7 @@ app.use('/api/sftp', sftpRoutes);
 app.use('/api', secondaryFs);
 app.use('/api', nfsRoutes);
 app.use('/api', monitoringRoutes);
+app.use('/api', incrementalRoutes);
 
 // ── Query Execution + Reports ───────────────────────────────────────────────
 // Isolated: a fault here must never stop backup scheduling.
@@ -61,6 +63,8 @@ app.get('/health', (req, res) => res.json({
 const PORT = process.env.PORT || 4100;
 server.listen(PORT, async () => {
   console.log(`[BackupVault] Running on :${PORT}`);
+  try { await require('./db/ensureSchema').ensureSchema(); }
+  catch (err) { console.warn('[schema] ensure failed:', err.message); }
   try { await scheduler.loadAndSchedule(); }
   catch (err) { console.warn('[Scheduler] Could not load jobs:', err.message); }
 });
