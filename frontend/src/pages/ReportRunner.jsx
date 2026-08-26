@@ -187,6 +187,7 @@ export default function ReportRunner() {
         </div>
       </header>
 
+      <div className="qe-body">
       <section className="qe-targets">
         <div className="qe-field qe-grow">
           <label htmlFor="rp-report">Report</label>
@@ -294,6 +295,7 @@ export default function ReportRunner() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -48,6 +48,7 @@ mkdir -p $BACKEND/reports $BACKEND/tmp/query-results
 cp backend/reports/*.json $BACKEND/reports/ 2>/dev/null || true
 mkdir -p /var/www/backupvault/scripts_for_incremental_backup
 cp scripts_for_incremental_backup/*.sh  /var/www/backupvault/scripts_for_incremental_backup/
+# Live incremental wrappers run on 10.180.0.90 via SSH; this copy is a repo snapshot only.
 # Only copy .env if it doesn't exist (preserve existing credentials)
 [ -f "$BACKEND/.env" ] || cp backend/.env $BACKEND/.env
 

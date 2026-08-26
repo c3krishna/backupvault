@@ -117,6 +117,26 @@ class Scheduler {
     this.systemTasks.push(nfsTask);
     console.log('[Scheduler] NFS live check → every 60s');
 
+    // 3c. Incremental rsync scripts on db-backup (10.180.0.90) — every 4 hours
+    const incCron = process.env.INCREMENTAL_CRON || '0 */4 * * *';
+    const incTz = process.env.INCREMENTAL_TZ || 'Asia/Kolkata';
+    if (cron.validate(incCron)) {
+      const incTask = cron.schedule(incCron, () => {
+        console.log('[Scheduler] Incremental 4h sync cycle...');
+        try {
+          const incremental = require('./incrementalService');
+          const r = incremental.startCycleInBackground('scheduled');
+          if (r.skipped) console.log('[Scheduler] Incremental cycle skipped:', r.reason);
+        } catch (err) {
+          console.error('[Scheduler] Incremental error:', err.message);
+        }
+      }, { timezone: incTz });
+      this.systemTasks.push(incTask);
+      console.log(`[Scheduler] Incremental sync → ${incCron} (${incTz}) via SSH`);
+    } else {
+      console.warn(`[Scheduler] Invalid INCREMENTAL_CRON: ${incCron}`);
+    }
+
     // 4. Run initial checks immediately at startup (after 10s delay)
     setTimeout(async () => {
       console.log('[Scheduler] Running startup health checks...');

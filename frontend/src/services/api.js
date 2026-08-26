@@ -126,9 +126,10 @@ export const nfsAPI = {
 };
 
 export const incrementalAPI = {
-  jobs: ()            => r('GET',  '/incremental/jobs'),
-  log:  (id, tail=200)=> r('GET',  `/incremental/jobs/${id}/log?tail=${tail}`),
-  run:  (id)          => r('POST', `/incremental/jobs/${id}/run`),
+  jobs:   ()            => r('GET',  '/incremental/jobs'),
+  log:    (id, tail=200)=> r('GET',  `/incremental/jobs/${id}/log?tail=${tail}`),
+  run:    (id)          => r('POST', `/incremental/jobs/${id}/run`),
+  runAll: ()            => r('POST', '/incremental/jobs/run-all'),
 };
 
 // Coerce MySQL decimal/int strings to JS numbers

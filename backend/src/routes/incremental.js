@@ -9,7 +9,8 @@ router.use(auth);
 
 router.get('/incremental/jobs', async (req, res) => {
   try {
-    res.json({ jobs: await incremental.listJobs(), runEnabled: incremental.runAllowed() });
+    const { jobs, meta } = await incremental.listJobs();
+    res.json({ jobs, runEnabled: meta.runEnabled, ...meta });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -26,9 +27,19 @@ router.get('/incremental/jobs/:id/log', async (req, res) => {
   }
 });
 
+router.post('/incremental/jobs/run-all', requireRole('super_admin', 'admin'), async (req, res) => {
+  try {
+    const started = incremental.startCycleInBackground('manual');
+    if (started.skipped) return res.status(409).json({ error: started.reason });
+    res.json({ success: true, ...started });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post('/incremental/jobs/:id/run', requireRole('super_admin', 'admin'), async (req, res) => {
   try {
-    const started = await incremental.runJob(req.params.id);
+    const started = await incremental.runJob(req.params.id, { wait: false });
     res.json({ success: true, ...started });
   } catch (e) {
     const status = /disabled|Unknown|not found/i.test(e.message) ? 400 : 500;

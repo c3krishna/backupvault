@@ -261,11 +261,11 @@ export default function BackupStrategy() {
 
         {/* ── STEP 3 ── */}
         <Step n="3" title="Incremental Backup → Remote Onsite DR (192.168.12.243) — Rule 3 (Scripts)" bg="var(--bv-green-dim)">
-          <Card icon="terminal-2" title="scripts_for_incremental_backup/ — 7 per-DB rsync wrappers" color="green"
+          <Card icon="terminal-2" title="db-backup 10.180.0.90 — /usr/local/src/scripts_for_incremental_backup/" color="green"
             lines={[
-              'Not a second mysqldump — rsync of a staged .sql.gz to Remote, then md5 verify',
-              'Logs: /var/log/<db>-incremental.log  ·  SUCCESS line means the script finished',
-              'Status and log tail: Incremental Backup menu in this portal',
+              'Not a second mysqldump — rsync of a staged .sql.gz from local staging to Remote, then md5 verify',
+              'BackupVault SSHes as root@10.180.0.90 (key auth) and runs the 7 wrappers every 4 hours (IST)',
+              'Logs on db-backup: /var/log/<db>-incremental.log  ·  SUCCESS line means the script finished',
             ]} />
           <Arrow label="rsync -avz --checksum over SSH · port 22" color="var(--bv-green)" />
           <Card icon="building" title="Remote Onsite DR — 192.168.12.243:/home/worktual/<db>/" color="amber"
@@ -275,8 +275,8 @@ export default function BackupStrategy() {
               'On-demand full dumps still rsync to /backups/remote via BackupVault engine',
             ]} />
           <InfoBox color="green">
-            <strong>Portal:</strong> Open <em>Incremental Backup</em> to see whether each script last succeeded
-            and to read the log. Missing log = not executed yet on this host.
+            <strong>Portal:</strong> Open <em>Incremental Backup</em> for live status, log tail, and Run now.
+            Schedule is 00:00 / 04:00 / 08:00 / 12:00 / 16:00 / 20:00 Asia/Kolkata.
           </InfoBox>
         </Step>
 

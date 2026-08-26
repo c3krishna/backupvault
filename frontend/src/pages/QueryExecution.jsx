@@ -187,6 +187,7 @@ export default function QueryExecution() {
         </button>
       </header>
 
+      <div className="qe-body">
       {isLive && (
         <div className="qe-banner" role="status">
           <strong>Production target.</strong> Statements run against LIVE data and every execution is recorded
@@ -389,6 +390,7 @@ export default function QueryExecution() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

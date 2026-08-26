@@ -98,8 +98,8 @@ function Layout() {
           <ThemeSwitcher/>
         </div>
 
-        {/* Page content */}
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        {/* Page content — column so every route stretches to full width */}
+        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <Routes>
             <Route path="/dashboard"    element={<Dashboard/>}/>
             <Route path="/targets"      element={<Targets/>}/>
