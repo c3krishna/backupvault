@@ -168,6 +168,7 @@ export const monitoringAPI = {
 
 export const ociAPI = {
   list:        (id, prefix) => r('GET',  `/oci/${id}/list?prefix=${encodeURIComponent(prefix||'')}`),
+  folderStats: (id, prefix) => r('GET',  `/oci/${id}/folder-stats?prefix=${encodeURIComponent(prefix||'')}`),
   presign:     (id, key)    => r('GET',  `/oci/${id}/presign?key=${encodeURIComponent(key)}`),
   test:        (id)         => r('POST', `/oci/${id}/test`),
   generateKey: ()           => r('POST', '/oci/generate-key'),

@@ -1,12 +1,13 @@
 // frontend/src/pages/OCIBrowser.js
 // OCI Object Storage file browser — S3-compatible API with AES-256-GCM encryption support
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ociAPI, destinationsAPI } from '../services/api';
 import { Spinner, Btn, toast } from '../components/UI';
 
 function fmtBytes(b) {
-  if (!b || b === 0) return '—';
+  if (b == null) return '—';
+  if (b === 0) return '0 B';
   const u = ['B','KB','MB','GB','TB'];
   const i = Math.floor(Math.log(Math.max(b,1)) / Math.log(1024));
   return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i];
@@ -30,6 +31,8 @@ export default function OCIBrowser() {
   const [filter,      setFilter]     = useState('');
   const [downloading, setDownloading]= useState(null);
   const [totalStats,  setTotalStats] = useState(null);
+  const [folderStats, setFolderStats]= useState({});
+  const statsTimer = useRef({});
 
   // Load all OCI destinations
   useEffect(() => {
@@ -67,6 +70,18 @@ export default function OCIBrowser() {
         .sort((a, b) => new Date(b.modified) - new Date(a.modified));
 
       setItems({ folders, files });
+      Object.values(statsTimer.current).forEach(clearTimeout);
+      statsTimer.current = {};
+      setFolderStats({});
+
+      folders.forEach((folder, idx) => {
+        statsTimer.current[folder.prefix] = setTimeout(async () => {
+          try {
+            const stats = await ociAPI.folderStats(dest.id, folder.prefix);
+            setFolderStats(prev => ({ ...prev, [folder.prefix]: stats }));
+          } catch { /* keep dashes if a folder cannot be summarised */ }
+        }, 120 * idx);
+      });
 
       // Bucket total stats
       if (!prefix && result.Name) {
@@ -113,7 +128,19 @@ export default function OCIBrowser() {
 
   const config       = dest ? (typeof dest.config === 'string' ? JSON.parse(dest.config) : dest.config) : {};
   const encEnabled   = dest?.encryption_enabled || config?.encryption_enabled;
-  const filteredFiles= items.files.filter(f => !filter || f.name.toLowerCase().includes(filter.toLowerCase()));
+  const q            = filter.trim().toLowerCase();
+  const filteredFolders = items.folders
+    .filter(f => !q || f.name.toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => {
+      const da = folderStats[a.prefix]?.lastModified;
+      const db = folderStats[b.prefix]?.lastModified;
+      if (da && db) return new Date(db) - new Date(da);
+      if (da) return -1;
+      if (db) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  const filteredFiles= items.files.filter(f => !q || f.name.toLowerCase().includes(q));
 
   if (allDests.length === 0 && !loading) return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
@@ -235,10 +262,10 @@ export default function OCIBrowser() {
 
             {/* Table header */}
             <div style={{ display:'grid',
-              gridTemplateColumns:'1fr 120px 120px 160px 150px',
+              gridTemplateColumns:'minmax(180px,1fr) 90px 110px 160px 130px 130px',
               padding:'8px 16px', background:'var(--bv-bg3)',
               borderBottom:'1px solid var(--bv-bd)' }}>
-              {['Name','','Size','Last Modified','Storage Class'].map((h,i) => (
+              {['Name','Files','Size','Last Modified','Storage Class',''].map((h,i) => (
                 <div key={i} style={{ fontSize:10, fontWeight:600, color:'var(--bv-txt3)',
                   textTransform:'uppercase', letterSpacing:'.06em' }}>{h}</div>
               ))}
@@ -251,7 +278,7 @@ export default function OCIBrowser() {
                 parts.pop();
                 navigate(parts.length ? parts.join('/') + '/' : '');
               }} style={{ display:'grid',
-                gridTemplateColumns:'1fr 120px 120px 160px 150px',
+                gridTemplateColumns:'minmax(180px,1fr) 90px 110px 160px 130px 130px',
                 padding:'10px 16px', cursor:'pointer', borderBottom:'1px solid var(--bv-bd)',
                 background:'var(--bv-card)' }}
                 onMouseEnter={e => e.currentTarget.style.background='var(--bv-hover)'}
@@ -259,15 +286,17 @@ export default function OCIBrowser() {
                 <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--bv-blue)', fontSize:13 }}>
                   <i className="ti ti-arrow-up" style={{ fontSize:14 }}/> ../ (back)
                 </div>
-                <div/><div/><div/><div/>
+                <div/><div/><div/><div/><div/>
               </div>
             )}
 
-            {/* Folders */}
-            {items.folders.map((folder, i) => (
+            {/* Folders — last modified = newest object inside the prefix */}
+            {filteredFolders.map((folder, i) => {
+              const stats = folderStats[folder.prefix];
+              return (
               <div key={folder.prefix} onClick={() => navigate(folder.prefix)}
                 style={{ display:'grid',
-                  gridTemplateColumns:'1fr 120px 120px 160px 150px',
+                  gridTemplateColumns:'minmax(180px,1fr) 90px 110px 160px 130px 130px',
                   padding:'10px 16px', cursor:'pointer',
                   borderBottom:'1px solid var(--bv-bd)',
                   background: i % 2 === 0 ? 'var(--bv-card)' : 'var(--bv-bg3)' }}
@@ -277,23 +306,43 @@ export default function OCIBrowser() {
                   <i className="ti ti-folder-filled" style={{ color:'var(--bv-amber)', fontSize:18 }}/>
                   <span style={{ color:'var(--bv-txt)', fontWeight:500 }}>{folder.name}/</span>
                 </div>
-                <div style={{ fontSize:11, color:'var(--bv-txt3)' }}>—</div>
-                <div style={{ fontSize:11, color:'var(--bv-txt3)' }}>—</div>
-                <div style={{ fontSize:11, color:'var(--bv-txt3)' }}>—</div>
-                <div style={{ fontSize:11, color:'var(--bv-txt3)' }}>
+                <div style={{ fontSize:11, color:'var(--bv-txt2)', alignSelf:'center' }}>
+                  {stats
+                    ? <span style={{ fontWeight:500 }}>{stats.totalObjects} file{stats.totalObjects===1?'':'s'}</span>
+                    : <span style={{ color:'var(--bv-txt3)' }}>…</span>}
+                </div>
+                <div style={{ fontSize:12, color:'var(--bv-txt2)', alignSelf:'center' }}>
+                  {stats ? fmtBytes(stats.totalSize) : <span style={{ fontSize:10, color:'var(--bv-txt3)' }}>calculating…</span>}
+                </div>
+                <div style={{ fontSize:11, color:'var(--bv-txt)', alignSelf:'center', whiteSpace:'nowrap' }}>
+                  {stats ? fmtDate(stats.lastModified) : <span style={{ color:'var(--bv-txt3)' }}>—</span>}
+                </div>
+                <div style={{ alignSelf:'center' }}>
+                  {stats?.storageClass ? (
+                    <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8,
+                      background:'var(--bv-bg4)', color:'var(--bv-txt3)',
+                      fontWeight:600, fontFamily:'monospace' }}>
+                      {stats.storageClass}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize:11, color:'var(--bv-txt3)' }}>—</span>
+                  )}
+                </div>
+                <div style={{ alignSelf:'center', color:'var(--bv-txt3)' }}>
                   <i className="ti ti-chevron-right" style={{ fontSize:12 }}/>
                 </div>
               </div>
-            ))}
+              );
+            })}
 
             {/* Files */}
             {filteredFiles.map((file, i) => (
               <div key={file.key}
                 style={{ display:'grid',
-                  gridTemplateColumns:'1fr 120px 120px 160px 150px',
+                  gridTemplateColumns:'minmax(180px,1fr) 90px 110px 160px 130px 130px',
                   padding:'10px 16px',
                   borderBottom: i < filteredFiles.length-1 ? '1px solid var(--bv-bd)' : 'none',
-                  background: (items.folders.length + i) % 2 === 0 ? 'var(--bv-card)' : 'var(--bv-bg3)' }}>
+                  background: (filteredFolders.length + i) % 2 === 0 ? 'var(--bv-card)' : 'var(--bv-bg3)' }}>
 
                 {/* Name */}
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -312,6 +361,28 @@ export default function OCIBrowser() {
                   </div>
                 </div>
 
+                {/* Files count (folders only) */}
+                <div style={{ fontSize:11, color:'var(--bv-txt3)', alignSelf:'center' }}>—</div>
+
+                {/* Size */}
+                <div style={{ fontSize:12, color:'var(--bv-txt2)', alignSelf:'center' }}>
+                  {fmtBytes(file.size)}
+                </div>
+
+                {/* Date */}
+                <div style={{ fontSize:11, color:'var(--bv-txt)', alignSelf:'center', whiteSpace:'nowrap' }}>
+                  {fmtDate(file.modified)}
+                </div>
+
+                {/* Storage class */}
+                <div style={{ alignSelf:'center' }}>
+                  <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8,
+                    background:'var(--bv-bg4)', color:'var(--bv-txt3)',
+                    fontWeight:600, fontFamily:'monospace' }}>
+                    {file.storage}
+                  </span>
+                </div>
+
                 {/* Download */}
                 <div style={{ display:'flex', alignItems:'center' }}>
                   <button onClick={() => handleDownload(file)}
@@ -326,30 +397,11 @@ export default function OCIBrowser() {
                     {file.encrypted ? 'Download (.enc)' : 'Download'}
                   </button>
                 </div>
-
-                {/* Size */}
-                <div style={{ fontSize:12, color:'var(--bv-txt2)', alignSelf:'center' }}>
-                  {fmtBytes(file.size)}
-                </div>
-
-                {/* Date */}
-                <div style={{ fontSize:11, color:'var(--bv-txt3)', alignSelf:'center' }}>
-                  {fmtDate(file.modified)}
-                </div>
-
-                {/* Storage class */}
-                <div style={{ alignSelf:'center' }}>
-                  <span style={{ fontSize:10, padding:'2px 8px', borderRadius:8,
-                    background:'var(--bv-bg4)', color:'var(--bv-txt3)',
-                    fontWeight:600, fontFamily:'monospace' }}>
-                    {file.storage}
-                  </span>
-                </div>
               </div>
             ))}
 
             {/* Empty state */}
-            {items.folders.length === 0 && filteredFiles.length === 0 && !loading && (
+            {filteredFolders.length === 0 && filteredFiles.length === 0 && !loading && (
               <div style={{ textAlign:'center', padding:50, color:'var(--bv-txt3)' }}>
                 <i className="ti ti-folder-off" style={{ fontSize:40, display:'block',
                   marginBottom:12, color:'var(--bv-bd2)' }}/>

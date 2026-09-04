@@ -6,7 +6,7 @@ const https  = require('https');
 const path   = require('path');
 const fs     = require('fs-extra');
 const crypto = require('crypto');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 // ── ENCRYPTION CONFIG ─────────────────────────────────────────
 const ALGORITHM = 'aes-256-gcm';
@@ -211,6 +211,18 @@ function maskKey(k) {
   return k.substring(0, 4) + '****' + k.slice(-4);
 }
 
+function ociAwsEnv(parsed) {
+  return {
+    ...process.env,
+    AWS_ACCESS_KEY_ID:                 parsed.config.access_key,
+    AWS_SECRET_ACCESS_KEY:             parsed.config.secret_key,
+    AWS_DEFAULT_REGION:                parsed.config.region,
+    AWS_REQUEST_CHECKSUM_CALCULATION:  'when_required',
+    AWS_RESPONSE_CHECKSUM_VALIDATION:  'when_required',
+    AWS_PAGER:                         '',
+  };
+}
+
 function buildOciKey(localFilePath, filename) {
   try {
     const parts = localFilePath.split('/');
@@ -317,21 +329,69 @@ async function uploadToOCI(runId, localFilePath, dest, logFn) {
 // ── LIST BUCKET ──────────────────────────────────────────────
 async function listOCIBucket(config, prefix) {
   const parsed = parseConfig({ config });
-  const env = {
-    ...process.env,
-    AWS_ACCESS_KEY_ID:     parsed.config.access_key,
-    AWS_SECRET_ACCESS_KEY: parsed.config.secret_key,
-    AWS_DEFAULT_REGION:    parsed.config.region,
-  };
   const pfx = prefix || '';
-  const out = execSync(
-    'aws s3api list-objects-v2 --bucket "' + parsed.bucket + '"' +
-    (pfx ? ' --prefix "' + pfx + '"' : '') +
-    ' --delimiter "/" --endpoint-url "' + parsed.endpoint +
-    '" --region "' + parsed.config.region + '"',
-    { env, timeout: 30000 }
-  ).toString();
+  if (/["\\\n;|&$`]/.test(pfx)) throw new Error('Invalid prefix');
+  const args = [
+    's3api', 'list-objects-v2',
+    '--bucket', parsed.bucket,
+    '--delimiter', '/',
+    '--endpoint-url', parsed.endpoint,
+    '--region', parsed.config.region,
+    '--output', 'json',
+  ];
+  if (pfx) args.push('--prefix', pfx);
+  const out = execFileSync('aws', args, {
+    env: ociAwsEnv(parsed),
+    timeout: 30000,
+    maxBuffer: 10 * 1024 * 1024,
+  }).toString();
   return JSON.parse(out);
+}
+
+// ── FOLDER STATS (size, file count, newest LastModified) ─────
+async function folderStatsOCI(config, prefix) {
+  const parsed = parseConfig({ config });
+  const pfx = String(prefix || '');
+  if (/["\\\n;|&$`]/.test(pfx)) throw new Error('Invalid prefix');
+
+  const env = ociAwsEnv(parsed);
+  let continuation = null;
+  let totalSize = 0;
+  let totalObjects = 0;
+  let lastModified = null;
+  let storageClass = 'STANDARD';
+
+  do {
+    const args = [
+      's3api', 'list-objects-v2',
+      '--bucket', parsed.bucket,
+      '--endpoint-url', parsed.endpoint,
+      '--region', parsed.config.region,
+      '--output', 'json',
+      '--max-keys', '1000',
+    ];
+    if (pfx) args.push('--prefix', pfx);
+    if (continuation) args.push('--continuation-token', continuation);
+
+    const out = JSON.parse(execFileSync('aws', args, {
+      env,
+      timeout: 45000,
+      maxBuffer: 20 * 1024 * 1024,
+    }).toString() || '{}');
+
+    for (const obj of (out.Contents || [])) {
+      if (!obj || obj.Key === pfx) continue;
+      totalObjects += 1;
+      totalSize += Number(obj.Size) || 0;
+      if (obj.LastModified && (!lastModified || new Date(obj.LastModified) > new Date(lastModified))) {
+        lastModified = obj.LastModified;
+        storageClass = obj.StorageClass || storageClass;
+      }
+    }
+    continuation = out.IsTruncated ? (out.NextContinuationToken || null) : null;
+  } while (continuation);
+
+  return { prefix: pfx, totalSize, totalObjects, lastModified, storageClass };
 }
 
 // ── PRESIGN URL ──────────────────────────────────────────────
@@ -408,6 +468,7 @@ module.exports = {
   uploadToOCI,
   downloadFromOCI,
   listOCIBucket,
+  folderStatsOCI,
   presignOCI,
   testOciConnection,
   checkAllOCIDestinations,

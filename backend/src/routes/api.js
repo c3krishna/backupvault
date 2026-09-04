@@ -438,6 +438,18 @@ router.get('/oci/:id/list', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
+// GET /api/oci/:id/folder-stats?prefix=folder/
+router.get('/oci/:id/folder-stats', auth, async (req, res) => {
+  try {
+    const dest = await db.queryOne('SELECT * FROM backup_destinations WHERE id=?', [req.params.id]);
+    if (!dest) return res.status(404).json({ error:'Destination not found' });
+    const config = typeof dest.config === 'string' ? JSON.parse(dest.config) : dest.config;
+    const ociService = require('../services/ociService');
+    const stats = await ociService.folderStatsOCI(config, req.query.prefix || '');
+    res.json(stats);
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
 // GET /api/oci/:id/presign
 router.get('/oci/:id/presign', auth, async (req, res) => {
   try {
