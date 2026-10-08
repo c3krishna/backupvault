@@ -166,6 +166,11 @@ export const monitoringAPI = {
   nfsHistory:      (id,mins)  => r('GET',  `/monitoring/nfs/${id}/history?minutes=${mins||60}`),
 };
 
+export const maintenanceAPI = {
+  cloudRetention: () => r('GET', '/cloud-retention'),
+  runCloudRetention: (body) => r('POST', '/cloud-retention/run', body || {}),
+};
+
 export const ociAPI = {
   list:        (id, prefix) => r('GET',  `/oci/${id}/list?prefix=${encodeURIComponent(prefix||'')}`),
   folderStats: (id, prefix) => r('GET',  `/oci/${id}/folder-stats?prefix=${encodeURIComponent(prefix||'')}`),

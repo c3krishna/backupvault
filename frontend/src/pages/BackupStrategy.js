@@ -299,19 +299,19 @@ export default function BackupStrategy() {
         </Step>
 
         {/* ── STEP 5 ── */}
-        <Step n="5" title="AWS S3 Cloud Backup — ap-south-1 Mumbai (On-Demand + Lifecycle)" bg="var(--bv-purple-bg)">
-          <Card icon="brand-aws" title="S3 STANDARD_IA — s3://worktual-db-backups/" color="purple"
+        <Step n="5" title="AWS S3 + OCI Cloud Backup — 30-day retention" bg="var(--bv-purple-bg)">
+          <Card icon="brand-aws" title="S3 STANDARD_IA — s3://worktual-db-backup/" color="purple"
             lines={[
-              'Region: ap-south-1 (Mumbai) · Storage class: STANDARD_IA',
-              'Infrequent access pricing · immediate restore available',
-              'Triggered by on-demand backup (Rule 4) or scheduled jobs with S3 destination',
+              'Storage class: STANDARD_IA · uploaded by BackupVault engine + dump-host cron',
+              'Triggered by scheduled jobs or on-demand backup (Rule 4)',
+              'Retention: keep last 30 days — older Backup_DB objects purged daily at 06:30 IST',
             ]} />
-          <Arrow label="automatic S3 lifecycle policy after 90 days" color="var(--bv-txt3)" />
-          <Card icon="snowflake" title="S3 Glacier Deep Archive — auto after 90 days" color="cyan"
+          <Arrow label="same 30-day purge for OCI Object Storage" color="var(--bv-txt3)" />
+          <Card icon="cloud" title="OCI Object Storage — AES-256 encrypted .enc" color="cyan"
             lines={[
-              'Long-term cold storage · lowest cost per GB',
-              'Restore time: 12h (Glacier) or 48h (Deep Archive)',
-              'Lifecycle rule configured in S3 bucket — no manual action needed',
+              'Client-side encryption before upload · restore decrypts GCM or legacy CBC',
+              'Retention: keep last 30 days (CLOUD_RETENTION_DAYS) — same daily cloudRetention job',
+              'Non-backup files (e.g. docs) are never deleted by the purge',
             ]} />
         </Step>
 
@@ -320,16 +320,16 @@ export default function BackupStrategy() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <TierCard icon="device-floppy" title="Primary DB"    color="green"
               policy="Latest 50 days"
-              detail="Older files moved to Secondary DB when disk > 80%. Auto-cleanup after verified copy."/>
+              detail="Older files moved to Secondary DB when disk > 80%. No auto-delete from Primary."/>
             <TierCard icon="server-2"      title="Secondary DB"  color="cyan"
               policy="Long-term archive"
               detail="Manual copies from Primary DB (Rule 2). No auto-delete. Kept indefinitely."/>
             <TierCard icon="building"      title="Remote Onsite" color="amber"
               policy="Mirror + incremental scripts"
               detail="Full dumps rsync after each BackupVault run. Per-DB incremental scripts sync staged files to /home/worktual/<db>/."/>
-            <TierCard icon="brand-aws"     title="AWS S3"        color="purple"
-              policy="90 days → Glacier"
-              detail="STANDARD_IA for 90 days, then auto-transitioned to Glacier Deep Archive."/>
+            <TierCard icon="brand-aws"     title="AWS S3 + OCI"  color="purple"
+              policy="Keep 30 days · purge older"
+              detail="Daily job deletes Backup_DB dump objects older than 30 days on active S3 and OCI destinations."/>
           </div>
         </Step>
 
@@ -341,7 +341,8 @@ export default function BackupStrategy() {
           </div>
           <RuleRow n="5a" text="Every 60s: live df on NFS servers. Every 30 min: Primary/Secondary disk — alert at 80%, block new dumps at 90%" tag="Auto" tagColor="blue"/>
           <RuleRow n="5b" text="Every 15 min: test AWS S3 connectivity — auto-deactivate destination if bucket unreachable or credentials fail" tag="Auto" tagColor="blue"/>
-          <RuleRow n="5c" text="DB server reachability check before each backup — skip and log if server offline" tag="Auto" tagColor="blue"/>
+          <RuleRow n="5c" text="Daily 06:30 IST: cloud retention — keep last 30 days on S3 + OCI; purge older backup objects" tag="Auto" tagColor="blue"/>
+          <RuleRow n="5d" text="DB server reachability check before each backup — skip and log if server offline" tag="Auto" tagColor="blue"/>
 
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--bv-txt3)',
             textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 2, marginTop: 6 }}>

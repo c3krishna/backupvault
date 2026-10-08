@@ -338,7 +338,7 @@ export default function Dashboard() {
                   {s3Data?.status==='connected'?'● Connected':'○ Check config'}
                 </span>
               </div>
-              <div style={{fontSize:10,color:C.txt3}}>Rule 4: on-demand backup target · Lifecycle → Glacier 90 days</div>
+              <div style={{fontSize:10,color:C.txt3}}>Rule 4: on-demand backup target · keep 30 days · older objects purged daily</div>
             </div>
 
             {/* OCI Encrypted */}

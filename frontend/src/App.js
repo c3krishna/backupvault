@@ -26,6 +26,7 @@ import IncrementalBackup from './pages/IncrementalBackup';
 import QueryExecution from './pages/QueryExecution';
 import ReportRunner   from './pages/ReportRunner';
 import { StoragePage, PrimaryDCPage, SecondaryDCPage, SettingsPage, UsersPage } from './pages/Storage';
+import CloudPurge from './pages/CloudPurge';
 
 import './index.css';
 
@@ -120,6 +121,7 @@ function Layout() {
             <Route path="/live-logs"    element={<LiveLogsPage/>}/>
             <Route path="/users"        element={<UsersPage/>}/>
             <Route path="/settings"     element={<SettingsPage/>}/>
+            <Route path="/maintenance/purge" element={<CloudPurge/>}/>
             <Route path="/strategy"     element={<BackupStrategy/>}/>
             <Route path="/query"        element={<QueryExecution/>}/>
             <Route path="/reports"      element={<ReportRunner/>}/>

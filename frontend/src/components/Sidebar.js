@@ -1,6 +1,6 @@
 // frontend/src/components/Sidebar.js
 // Mobile-responsive: collapses to icon-only on small screens, hamburger toggle
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { destinationsAPI, infraAPI } from '../services/api';
@@ -11,6 +11,7 @@ const BREAKPOINT = 768; // px — below this, sidebar starts collapsed
 export default function Sidebar({ wsConnected }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // collapsed = icon-only mode; mobileOpen = overlay open on mobile
   const [collapsed,   setCollapsed]   = useState(() => window.innerWidth < BREAKPOINT);
@@ -18,6 +19,7 @@ export default function Sidebar({ wsConnected }) {
   const [isMobile,    setIsMobile]    = useState(() => window.innerWidth < BREAKPOINT);
   const [destInfo,    setDestInfo]    = useState({ s3:null, remote:null, primaryPct:null });
   const [nfsBadge,    setNfsBadge]    = useState(null); // { text, color } for NFS servers badge
+  const [maintOpen,   setMaintOpen]   = useState(() => window.location.pathname.startsWith('/maintenance'));
 
   // Responsive listener
   useEffect(() => {
@@ -116,6 +118,48 @@ export default function Sidebar({ wsConnected }) {
     );
   }
 
+  function maintMenu() {
+    const active = location.pathname.startsWith('/maintenance');
+    const items = [
+      { to: '/maintenance/purge', icon: 'trash', label: 'Purge old backups' },
+    ];
+    if (!showLabels) {
+      return navItem('/maintenance/purge', 'tool', 'Maintenance');
+    }
+    return (
+      <div key="maintenance">
+        <button
+          type="button"
+          onClick={() => setMaintOpen(o => !o)}
+          style={{
+            display:'flex', alignItems:'center', gap:9, width:'calc(100% - 12px)',
+            padding:'7px 12px', margin:'1px 6px', borderRadius:8, fontSize:12.5,
+            border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+            color: active ? 'var(--bv-blue)' : 'var(--bv-txt2)',
+            background: active ? 'var(--bv-blue-dim)' : 'transparent',
+          }}>
+          <i className="ti ti-tool" style={{ fontSize:16, width:16, color: active ? 'var(--bv-blue)' : 'var(--bv-txt3)' }}/>
+          <span style={{ flex:1 }}>Maintenance</span>
+          <i className={`ti ti-chevron-${maintOpen ? 'down' : 'right'}`} style={{ fontSize:12, color:'var(--bv-txt3)' }}/>
+        </button>
+        {maintOpen && items.map(item => (
+          <NavLink key={item.to} to={item.to}
+            onClick={() => isMobile && setMobileOpen(false)}
+            style={({ isActive }) => ({
+              display:'flex', alignItems:'center', gap:8,
+              padding:'6px 12px 6px 36px', margin:'1px 6px',
+              borderRadius:8, fontSize:12, textDecoration:'none',
+              color: isActive ? 'var(--bv-blue)' : 'var(--bv-txt2)',
+              background: isActive ? 'var(--bv-blue-dim)' : 'transparent',
+            })}>
+            <i className={`ti ti-${item.icon}`} style={{ fontSize:14, width:14 }}/>
+            <span style={{ whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
+    );
+  }
+
   function sectionLabel(text) {
     if (!showLabels) return (
       <div style={{ height:1, background:'var(--bv-bd)', margin:'6px 8px' }}/>
@@ -206,6 +250,8 @@ export default function Sidebar({ wsConnected }) {
         {navItem('/users',       'users',          'Users')}
         {navItem('/strategy',    'sitemap',        'Backup Strategy')}
         {navItem('/settings',    'settings',       'Settings')}
+        {sectionLabel('Maintenance')}
+        {maintMenu()}
       </nav>
 
       {/* Footer */}

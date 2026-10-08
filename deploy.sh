@@ -44,6 +44,7 @@ cp backend/src/services/mailService.js    $BACKEND/src/services/
 cp backend/src/services/notifier.js       $BACKEND/src/services/
 cp backend/src/services/ociService.js     $BACKEND/src/services/
 cp backend/src/services/incrementalService.js $BACKEND/src/services/
+cp backend/src/services/cloudRetention.js     $BACKEND/src/services/
 mkdir -p $BACKEND/reports $BACKEND/tmp/query-results
 cp backend/reports/*.json $BACKEND/reports/ 2>/dev/null || true
 mkdir -p /var/www/backupvault/scripts_for_incremental_backup

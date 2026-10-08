@@ -371,6 +371,10 @@ router.get('/settings', async (req, res) => {
     secondary_mount:     process.env.SECONDARY_MOUNT || '/secondary-db-backup',
     timezone:            'Asia/Kolkata',
     retention_default:   30,
+    cloud_retention_enabled: String(process.env.CLOUD_RETENTION_ENABLED || 'true').toLowerCase() !== 'false',
+    cloud_retention_days:    parseInt(process.env.CLOUD_RETENTION_DAYS || '30', 10),
+    cloud_retention_cron:    process.env.CLOUD_RETENTION_CRON || '30 6 * * *',
+    cloud_retention_dry_run: String(process.env.CLOUD_RETENTION_DRY_RUN || 'false').toLowerCase() === 'true',
     max_concurrent_jobs: 3,
     notification_email:  process.env.NOTIFY_EMAIL   || '',
     storage_warn_pct:    parseInt(process.env.STORAGE_WARN_PCT || '80'),
@@ -472,6 +476,36 @@ router.post('/oci/:id/test', auth, async (req, res) => {
     const result = await ociService.testOciConnection(config);
     res.json(result);
   } catch(e) { res.json({ success:false, error:e.message }); }
+});
+
+// GET /api/cloud-retention — current policy
+router.get('/cloud-retention', auth, async (req, res) => {
+  try {
+    const cloudRetention = require('../services/cloudRetention');
+    res.json({
+      enabled: cloudRetention.isEnabled(),
+      days: cloudRetention.retentionDays(),
+      dry_run: cloudRetention.isDryRun(),
+      cron: process.env.CLOUD_RETENTION_CRON || '30 6 * * *',
+      timezone: process.env.CLOUD_RETENTION_TZ || process.env.INCREMENTAL_TZ || 'Asia/Kolkata',
+      note: 'Keeps the last N days of backup objects on active AWS S3 and OCI destinations; older Backup_DB dumps are purged daily.',
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/cloud-retention/run — manual purge (admin). Body: { dry_run?: boolean, days?: number }
+router.post('/cloud-retention/run', auth, requireRole('super_admin', 'admin'), async (req, res) => {
+  try {
+    const cloudRetention = require('../services/cloudRetention');
+    const dryRun = req.body && req.body.dry_run != null ? !!req.body.dry_run : undefined;
+    const days = req.body && req.body.days != null ? parseInt(req.body.days, 10) : undefined;
+    const summary = await cloudRetention.runCloudRetention({
+      force: true,
+      dryRun,
+      days: Number.isFinite(days) ? days : undefined,
+    });
+    res.json(summary);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = (eng) => { engine = eng; return router; };

@@ -137,6 +137,29 @@ class Scheduler {
       console.warn(`[Scheduler] Invalid INCREMENTAL_CRON: ${incCron}`);
     }
 
+    // 3d. Cloud retention — purge AWS S3 + OCI objects older than CLOUD_RETENTION_DAYS
+    // Default: keep last 30 days; run daily 06:30 Asia/Kolkata
+    const cloudRetCron = process.env.CLOUD_RETENTION_CRON || '30 6 * * *';
+    const cloudRetTz = process.env.CLOUD_RETENTION_TZ || process.env.INCREMENTAL_TZ || 'Asia/Kolkata';
+    if (cron.validate(cloudRetCron)) {
+      const cloudRetTask = cron.schedule(cloudRetCron, async () => {
+        console.log('[Scheduler] Cloud retention purge (S3 + OCI)...');
+        try {
+          const cloudRetention = require('./cloudRetention');
+          const summary = await cloudRetention.runCloudRetention();
+          console.log(
+            `[Scheduler] Cloud retention done — deleted=${summary.deleted || 0} expired=${summary.expired || 0}`
+          );
+        } catch (err) {
+          console.error('[Scheduler] Cloud retention error:', err.message);
+        }
+      }, { timezone: cloudRetTz });
+      this.systemTasks.push(cloudRetTask);
+      console.log(`[Scheduler] Cloud retention → ${cloudRetCron} (${cloudRetTz}) keep ${process.env.CLOUD_RETENTION_DAYS || 30}d`);
+    } else {
+      console.warn(`[Scheduler] Invalid CLOUD_RETENTION_CRON: ${cloudRetCron}`);
+    }
+
     // 4. Run initial checks immediately at startup (after 10s delay)
     setTimeout(async () => {
       console.log('[Scheduler] Running startup health checks...');
