@@ -9,12 +9,17 @@ echo "================================================"
 
 BACKEND=/var/www/backupvault/backend
 FRONTEND=/var/www/backupvault/frontend
+ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 # 1. System dependencies
 echo "[1] Installing system dependencies..."
 pip3 install awscli --break-system-packages 2>/dev/null || true
 
-# 2. Backend files
+# Skip copies when git pull already landed in /var/www/backupvault.
+# GNU cp exits non-zero when source and destination are the same file.
+if [ "$ROOT" = "/var/www/backupvault" ]; then
+  echo "[2] In-place checkout — files already in $ROOT, skipping copy"
+else
 echo "[2] Deploying backend..."
 mkdir -p $BACKEND/src/{routes,services,db,controllers}
 cp backend/src/server.js            $BACKEND/src/
@@ -52,6 +57,7 @@ cp scripts_for_incremental_backup/*.sh  /var/www/backupvault/scripts_for_increme
 # Live incremental wrappers run on 10.180.0.90 via SSH; this copy is a repo snapshot only.
 # Only copy .env if it doesn't exist (preserve existing credentials)
 [ -f "$BACKEND/.env" ] || cp backend/.env $BACKEND/.env
+fi
 
 # 3. npm install
 echo "[3] Installing backend npm packages..."
@@ -62,9 +68,11 @@ mkdir -p /var/backups/backupvault /primary-db-backup /secondary-db-backup
 
 # 5. Frontend
 echo "[4] Building frontend..."
-cp -r frontend/src     $FRONTEND/
-cp frontend/public/index.html $FRONTEND/public/
-cp frontend/package.json $FRONTEND/
+if [ "$ROOT" != "/var/www/backupvault" ]; then
+  cp -r frontend/src     $FRONTEND/
+  cp frontend/public/index.html $FRONTEND/public/
+  cp frontend/package.json $FRONTEND/
+fi
 cd $FRONTEND && npm install && npm run build
 
 # 6. Restart backend
